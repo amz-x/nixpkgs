@@ -29,13 +29,14 @@
 
 stdenv.mkDerivation (finalAttrs: {
   pname = "elementary-monitor";
-  version = "8.0.1";
+  version = "8.0.1-unstable-2026-08-15";
 
+  # nixpkgs-update: no auto update
   src = fetchFromGitHub {
     owner = "elementary";
     repo = "monitor";
-    tag = finalAttrs.version;
-    hash = "sha256-VlyIK7UJEHw7vvc9WEHooPSPl8OQ5ZcBrjtYrI3Qx/w=";
+    rev = "f4ecbf35f57d71c571c336bc9b576b2c928a250b";
+    hash = "sha256-jq9I1tNpazKT2LJRNiX4YbDaGqwRHVaJqBW5mXfD1nk=";
   };
 
   strictDeps = true;

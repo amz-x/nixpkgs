@@ -3,38 +3,31 @@
   stdenv,
   fetchFromGitHub,
   nix-update-script,
-  replaceVars,
   pkg-config,
   meson,
   ninja,
   vala,
-  gtk3,
-  granite,
+  gtk4,
+  granite7,
   wingpanel,
   evolution-data-server,
+  libadwaita,
   libical,
   libgee,
   libhandy,
   libxml2,
-  elementary-calendar,
 }:
 
-stdenv.mkDerivation rec {
+stdenv.mkDerivation {
   pname = "wingpanel-indicator-datetime";
-  version = "2.4.2";
+  version = "2.4.2-unstable-2026-07-27"; # nixpkgs-update: no auto update
 
   src = fetchFromGitHub {
     owner = "elementary";
-    repo = "wingpanel-indicator-datetime";
-    rev = version;
-    sha256 = "sha256-iR80pF3KUe0WboFm2/f1ZK9/wER2LfmRBd92e8jGTHs=";
+    repo = "panel-datetime";
+    rev = "7f17fda9f42b71d3c30977deaf3fbe6273e59dad";
+    sha256 = "sha256-azp/+c9CbF7/1OAXqFT3o5zVq5HMCE6sCtquQfF5710=";
   };
-
-  patches = [
-    (replaceVars ./fix-paths.patch {
-      elementary_calendar = elementary-calendar;
-    })
-  ];
 
   nativeBuildInputs = [
     libxml2
@@ -46,8 +39,9 @@ stdenv.mkDerivation rec {
 
   buildInputs = [
     evolution-data-server
-    granite
-    gtk3
+    granite7
+    gtk4
+    libadwaita
     libgee
     libhandy
     libical
@@ -60,7 +54,7 @@ stdenv.mkDerivation rec {
 
   meta = {
     description = "Date & Time Indicator for Wingpanel";
-    homepage = "https://github.com/elementary/wingpanel-indicator-datetime";
+    homepage = "https://github.com/elementary/panel-datetime";
     license = lib.licenses.gpl3Plus;
     platforms = lib.platforms.linux;
     teams = [ lib.teams.pantheon ];

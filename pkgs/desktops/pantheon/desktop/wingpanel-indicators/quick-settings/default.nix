@@ -11,8 +11,9 @@
   wayland-scanner,
   accountsservice,
   elementary-settings-daemon,
-  granite,
-  gtk3,
+  granite7,
+  gtk4,
+  libadwaita,
   libgee,
   libhandy,
   libportal,
@@ -23,21 +24,14 @@
 
 stdenv.mkDerivation (finalAttrs: {
   pname = "wingpanel-quick-settings";
-  version = "1.4.0";
+  version = "1.4.0-unstable-2026-09-03"; # nixpkgs-update: no auto update
 
   src = fetchFromGitHub {
     owner = "elementary";
     repo = "quick-settings";
-    rev = finalAttrs.version;
-    hash = "sha256-J40h/4xhs12FmaaBpQ+0/KGCtRLmP592TS3xHeoxGIE=";
+    rev = "f999414ae2d18e95617748b848fd8def339aceb7";
+    hash = "sha256-HSIhqbfVeZ4AvXr4Gwrw08TNnpHQxlJUY7eyjErD3sg=";
   };
-
-  patches = [
-    # We no longer ship Pantheon X11 session in NixOS.
-    # https://github.com/elementary/session-settings/issues/91
-    # https://github.com/elementary/session-settings/issues/82
-    ./hide-onscreen-keyboard-settings.patch
-  ];
 
   nativeBuildInputs = [
     glib # glib-compile-resources
@@ -52,8 +46,9 @@ stdenv.mkDerivation (finalAttrs: {
     accountsservice
     elementary-settings-daemon # for prefers-color-scheme
     glib
-    granite
-    gtk3
+    granite7
+    gtk4
+    libadwaita
     libgee
     libhandy
     libportal

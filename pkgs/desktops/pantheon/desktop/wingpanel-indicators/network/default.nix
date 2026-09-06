@@ -7,24 +7,24 @@
   meson,
   ninja,
   vala,
-  gtk3,
-  granite,
+  gtk4,
+  granite7,
   networkmanager,
   polkit,
-  libnma,
+  libnma-gtk4,
   wingpanel,
   libgee,
 }:
 
-stdenv.mkDerivation rec {
+stdenv.mkDerivation {
   pname = "wingpanel-indicator-network";
-  version = "8.0.1";
+  version = "8.0.1-unstable-2026-08-28"; # nixpkgs-update: no auto update
 
   src = fetchFromGitHub {
     owner = "elementary";
-    repo = "wingpanel-indicator-network";
-    tag = version;
-    hash = "sha256-tmtd+lV/7aofH1xsYy5oG82HwEE1TyzP0ZP6nGY0prA=";
+    repo = "panel-network";
+    rev = "82cdad09cd8f19adbe0097f8c4de8b4bd8f6b4cd";
+    hash = "sha256-yOllt3pkW6DmUUH12t/tDt9ayvR/eIP3RqysMFavR+8=";
   };
 
   nativeBuildInputs = [
@@ -35,12 +35,12 @@ stdenv.mkDerivation rec {
   ];
 
   buildInputs = [
-    granite
-    gtk3
+    granite7
+    gtk4
     libgee
     networkmanager
     polkit
-    libnma
+    libnma-gtk4
     wingpanel
   ];
 
@@ -50,7 +50,7 @@ stdenv.mkDerivation rec {
 
   meta = {
     description = "Network Indicator for Wingpanel";
-    homepage = "https://github.com/elementary/wingpanel-indicator-network";
+    homepage = "https://github.com/elementary/panel-network";
     license = lib.licenses.lgpl21Plus;
     platforms = lib.platforms.linux;
     teams = [ lib.teams.pantheon ];

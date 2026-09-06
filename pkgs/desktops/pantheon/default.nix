@@ -26,6 +26,7 @@ lib.makeScope pkgs.newScope (
       switchboard-plug-security-privacy
       switchboard-plug-sharing
       switchboard-plug-sound
+      switchboard-plug-useraccounts
       switchboard-plug-wacom
     ];
 
@@ -45,10 +46,10 @@ lib.makeScope pkgs.newScope (
 
     teams = [ lib.teams.pantheon ];
 
-    mutter = pkgs.mutter48;
+    mutter = pkgs.mutter50;
 
-    # Using 48 to match Mutter used in Pantheon
-    gnome-settings-daemon = pkgs.gnome-settings-daemon48;
+    # Using 50 to match Mutter used in Pantheon
+    gnome-settings-daemon = pkgs.gnome-settings-daemon50;
 
     elementary-gsettings-schemas = callPackage ./desktop/elementary-gsettings-schemas { };
 
@@ -65,6 +66,8 @@ lib.makeScope pkgs.newScope (
     elementary-camera = callPackage ./apps/elementary-camera { };
 
     elementary-code = callPackage ./apps/elementary-code { };
+
+    elementary-contacts = callPackage ./apps/elementary-contacts { };
 
     elementary-dock = callPackage ./apps/elementary-dock { };
 
@@ -125,6 +128,8 @@ lib.makeScope pkgs.newScope (
     granite = callPackage ./libraries/granite { };
 
     granite7 = callPackage ./libraries/granite/7 { };
+
+    granite9 = callPackage ./libraries/granite/9 { };
 
     live-chart = callPackage ./libraries/live-chart { };
 
@@ -213,6 +218,8 @@ lib.makeScope pkgs.newScope (
     switchboard-plug-sharing = callPackage ./apps/switchboard-plugs/sharing { };
 
     switchboard-plug-sound = callPackage ./apps/switchboard-plugs/sound { };
+
+    switchboard-plug-useraccounts = callPackage ./apps/switchboard-plugs/useraccounts { };
 
     switchboard-plug-wacom = callPackage ./apps/switchboard-plugs/wacom { };
 

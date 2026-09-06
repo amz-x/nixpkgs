@@ -7,22 +7,22 @@
   meson,
   ninja,
   vala,
-  gtk3,
-  granite,
+  gtk4,
+  granite7,
   wingpanel,
   libgee,
   libxml2,
 }:
 
-stdenv.mkDerivation rec {
+stdenv.mkDerivation {
   pname = "wingpanel-indicator-nightlight";
-  version = "2.1.3";
+  version = "2.1.3-unstable-2026-06-22"; # nixpkgs-update: no auto update
 
   src = fetchFromGitHub {
     owner = "elementary";
-    repo = "wingpanel-indicator-nightlight";
-    rev = version;
-    sha256 = "sha256-77+JGJ0/Y9UJwOuKfJAqjNnmZfBy/YiEwCybx6yoVwM=";
+    repo = "panel-nightlight";
+    rev = "f226c2e6f7b1a1d39018101e515c61af69260ebd";
+    sha256 = "sha256-3Eh03QEyKQnYSK6LxVHxMbDcv2Akx/Uu72Hs02s/5GY=";
   };
 
   nativeBuildInputs = [
@@ -34,8 +34,8 @@ stdenv.mkDerivation rec {
   ];
 
   buildInputs = [
-    granite
-    gtk3
+    granite7
+    gtk4
     libgee
     wingpanel
   ];
@@ -46,7 +46,7 @@ stdenv.mkDerivation rec {
 
   meta = {
     description = "Night Light Indicator for Wingpanel";
-    homepage = "https://github.com/elementary/wingpanel-indicator-nightlight";
+    homepage = "https://github.com/elementary/panel-nightlight";
     license = lib.licenses.gpl2Plus;
     platforms = lib.platforms.linux;
     teams = [ lib.teams.pantheon ];

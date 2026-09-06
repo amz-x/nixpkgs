@@ -1,41 +1,75 @@
 {
-  stdenv,
-  lib,
-  fetchFromGitHub,
-  desktop-file-utils,
-  gettext,
-  libxml2,
-  meson,
-  ninja,
-  pkg-config,
-  vala,
-  wayland-scanner,
-  wrapGAppsHook4,
+  accountsservice,
   at-spi2-core,
-  gnome-settings-daemon,
+  desktop-file-utils,
+  fetchFromGitHub,
+  gettext,
+  glycin-loaders,
   gnome-desktop,
+  gnome-settings-daemon,
   granite,
   granite7,
   gtk3,
   gtk4,
+  ibus,
+  json-glib,
+  lcms2,
+  lib,
   libgee,
   libhandy,
+  libxi,
+  libxkbcommon,
+  libxml2,
+  libxslt,
+  meson,
   mutter,
-  sqlite,
-  systemd,
+  ninja,
   nix-update-script,
+  pkg-config,
+  sqlite,
+  stdenv,
+  systemd,
+  vala,
+  wayland-scanner,
+  wrapGAppsHook4,
 }:
 
 stdenv.mkDerivation (finalAttrs: {
   pname = "gala";
-  version = "8.5.1";
+  version = "8.5.1-unstable-2026-09-04"; # nixpkgs-update: no auto update
 
   src = fetchFromGitHub {
     owner = "elementary";
     repo = "gala";
-    tag = finalAttrs.version;
-    hash = "sha256-f+/RaKG208v84q1V9NkDci0wuGAtXwjVsF7ITDAgHCQ=";
+    rev = "a52cafe94ed748e132a3093eb17fb7980fc760b2";
+    hash = "sha256-fD3jMjZSkesU2dTCMmYzHjFdYXfSWdq268CMmiVRf+A=";
   };
+
+  patches = [
+    # Upstream elementary-greeter execs gala directly as its Wayland
+    # compositor, but unlike the old standalone greeter-compositor, gala
+    # has no code to spawn the actual login UI as a trusted Wayland client
+    # -- so nothing shows a login prompt. Do so ourselves, the same way
+    # gala already launches gala-daemon and io.elementary.notifications.
+    ./spawn-greeter-clients.patch
+
+    # BackgroundContainer's destructor re-derives the monitor manager from
+    # display/context/backend, which segfaults if the backend is already
+    # mid-teardown -- as happens when gala's own process actually exits,
+    # which normally only the greeter's gala instance does (once the user
+    # logs in). Hold a proper reference instead of re-deriving it.
+    ./fix-background-container-shutdown-crash.patch
+
+    # PantheonShell's focus() (backing the pantheon-desktop-shell-v1
+    # "focus" request wingpanel/indicators use to ask for keyboard focus)
+    # passes Meta.Display.get_current_time(), which just returns a cached
+    # timestamp that can go stale -- meta_display_set_input_focus() then
+    # silently rejects the whole request if that timestamp is older than
+    # the display's last_user_time (which keeps advancing on any input
+    # anywhere, e.g. the user clicking into an unrelated application).
+    # Use get_current_time_roundtrip() instead, which is never stale.
+    ./fix-stale-focus-timestamp.patch
+  ];
 
   depsBuildBuild = [ pkg-config ];
 
@@ -43,6 +77,7 @@ stdenv.mkDerivation (finalAttrs: {
     desktop-file-utils
     gettext
     libxml2
+    libxslt
     meson
     ninja
     pkg-config
@@ -52,19 +87,33 @@ stdenv.mkDerivation (finalAttrs: {
   ];
 
   buildInputs = [
+    accountsservice
     at-spi2-core
-    gnome-settings-daemon
+    glycin-loaders
     gnome-desktop
+    gnome-settings-daemon
     granite
     granite7
     gtk3 # daemon-gtk3
     gtk4
+    ibus
+    json-glib
+    lcms2
     libgee
     libhandy
+    libxi
+    libxkbcommon
     mutter
     sqlite
     systemd
   ];
+
+  preFixup = ''
+    # Needed for setting background images.
+    gappsWrapperArgs+=(
+      --prefix XDG_DATA_DIRS : "${glycin-loaders}/share"
+    )
+  '';
 
   postPatch = ''
     substituteInPlace meson.build \

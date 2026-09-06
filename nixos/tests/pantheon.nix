@@ -25,8 +25,13 @@
     {
       imports = [ ./common/user-account.nix ];
 
-      # Workaround ".gala-wrapped invoked oom-killer"
-      virtualisation.memorySize = 2047;
+      # Workaround ".gala-wrapped invoked oom-killer". The greeter phase
+      # runs a second gala+login UI on top of the real session's own
+      # gala+apps once logged in, and locking the screen (tested below)
+      # briefly runs a *third* gala+greeter instance for the fresh
+      # unlock session on top of that, so give this more headroom than
+      # a single-session Pantheon desktop needs.
+      virtualisation.memorySize = 2048;
 
       services.xserver.enable = true;
       services.desktopManager.pantheon.enable = true;
@@ -52,17 +57,23 @@
       user = nodes.machine.users.users.alice;
     in
     ''
+      import datetime
+
       machine.wait_for_unit("display-manager.service")
 
       with subtest("Test we can see usernames in elementary-greeter"):
           machine.wait_for_text("${user.description}")
-          machine.wait_until_succeeds("pgrep -f io.elementary.greeter-compositor")
+          # Gala is executed directly as the greeter's compositor and spawns
+          # the actual login UI itself; bracket the first letter so pgrep
+          # doesn't match its own invocation (it's run as `bash -c "pgrep
+          # -f ..."`, which contains the pattern in its own cmdline).
+          machine.wait_until_succeeds("pgrep -f '[i]o.elementary.greeter$'")
           # Ensure the password box is focused by clicking it.
           # Workaround for https://github.com/NixOS/nixpkgs/issues/211366.
-          machine.succeed("ydotool mousemove -a 220 275")
+          machine.succeed("ydotool mousemove -a 309 288")
           machine.succeed("ydotool click 0xC0")
           machine.sleep(2)
-          machine.screenshot("elementary_greeter_lightdm")
+          machine.screenshot("greeter")
 
       with subtest("Login with elementary-greeter"):
           machine.send_chars("${user.password}\n")
@@ -120,11 +131,36 @@
           machine.screenshot("multitasking")
           machine.succeed(f"su - ${user.name} -c '{env} {cmd}'")
 
+      with subtest("Lock the screen"):
+          # Gala's SessionLocker doesn't have an in-session unlock UI yet
+          # (see the comment on LockScreenManager.manually_locked upstream)
+          # -- it just shows a black shield actor and, on user activity,
+          # switches back to a fresh LightDM greeter session to unlock. So
+          # we can only assert on the locked state itself here, via the
+          # org.gnome.ScreenSaver D-Bus interface gala also exposes.
+          env = "DBUS_SESSION_BUS_ADDRESS=unix:path=/run/user/${toString user.uid}/bus"
+          lock_cmd = "dbus-send --session --dest=org.gnome.ScreenSaver --print-reply /org/gnome/ScreenSaver org.gnome.ScreenSaver.Lock"
+          get_active_cmd = "dbus-send --session --dest=org.gnome.ScreenSaver --print-reply /org/gnome/ScreenSaver org.gnome.ScreenSaver.GetActive"
+          machine.succeed(f"su - ${user.name} -c '{env} {lock_cmd}'")
+          machine.wait_until_succeeds(f"su - ${user.name} -c '{env} {get_active_cmd}' | grep -q 'boolean true'")
+          machine.sleep(2)
+          machine.screenshot("locked")
+
+      with subtest("Unlock the screen"):
+          machine.send_chars(" ")
+          machine.sleep(15)
+          machine.succeed("ydotool mousemove -a 309 288")
+          machine.succeed("ydotool click 0xC0")
+          machine.sleep(2)
+          machine.send_chars("${user.password}\n")
+          machine.sleep(datetime.timedelta(milliseconds=250))
+          machine.screenshot("unlocking")
+
       with subtest("Check if gala has ever coredumped"):
           machine.fail("coredumpctl --json=short | grep gala")
           # So we can see the dock.
           machine.execute("pkill -f -9 io.elementary.videos")
           machine.sleep(10)
-          machine.screenshot("screen")
+          machine.screenshot("desktop")
     '';
 }

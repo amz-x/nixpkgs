@@ -22,15 +22,15 @@
   libportal-gtk3,
 }:
 
-stdenv.mkDerivation rec {
+stdenv.mkDerivation {
   pname = "elementary-calendar";
-  version = "8.0.2";
+  version = "8.0.2-unstable-2026-08-14"; # nixpkgs-update: no auto update
 
   src = fetchFromGitHub {
     owner = "elementary";
     repo = "calendar";
-    tag = version;
-    hash = "sha256-YFO+tMJsidp5Tq8mAobdc1VBHR2DuMJlEnwSg+mVScM=";
+    rev = "42393174960f8c4d88260e51e4a086d1c5f9c19f";
+    hash = "sha256-z/GKp2paaoLRnX6Prbvj/bcrsui/pxxi13Lm2FN7bMo=";
   };
 
   nativeBuildInputs = [

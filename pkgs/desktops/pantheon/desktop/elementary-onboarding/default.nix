@@ -19,15 +19,15 @@
   pantheon-wayland,
 }:
 
-stdenv.mkDerivation rec {
+stdenv.mkDerivation {
   pname = "elementary-onboarding";
-  version = "8.1.0";
+  version = "8.1.0-unstable-2026-08-30"; # nixpkgs-update: no auto update
 
   src = fetchFromGitHub {
     owner = "elementary";
     repo = "onboarding";
-    rev = version;
-    sha256 = "sha256-y5qMZoVqFpE3d6PRKDO1ldMULCaH3S4phJgAMhY2dSg=";
+    rev = "a36eb978abe2b7243723b7805df40cb48e2f9bc4";
+    sha256 = "sha256-EARCOGCkRf77c6ssGCgkFm+Necl2v8BP+R5XFoDrMKs=";
   };
 
   nativeBuildInputs = [

@@ -25,9 +25,9 @@
   systemd,
 }:
 
-stdenv.mkDerivation rec {
+stdenv.mkDerivation {
   pname = "elementary-files";
-  version = "7.3.2";
+  version = "7.3.2-unstable-2026-09-03"; # nixpkgs-update: no auto update
 
   outputs = [
     "out"
@@ -37,8 +37,8 @@ stdenv.mkDerivation rec {
   src = fetchFromGitHub {
     owner = "elementary";
     repo = "files";
-    rev = version;
-    hash = "sha256-DFW2C9Uoa9RIqP7DoskEK0X0RQxb0nYe85xsgogOaKs=";
+    rev = "9cb347026f32805beb1e622bc071084bbbe2a89f";
+    hash = "sha256-Is2qapR5VVp5S/1DPNv9H7tV2HDb/sh0HuIQai3omRA=";
   };
 
   nativeBuildInputs = [

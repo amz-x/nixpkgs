@@ -22,18 +22,17 @@
 
 stdenv.mkDerivation (finalAttrs: {
   pname = "elementary-session-settings";
-  version = "8.1.0";
+  version = "8.1.0-unstable-2026-06-29"; # nixpkgs-update: no auto update
 
   src = fetchFromGitHub {
     owner = "elementary";
     repo = "session-settings";
-    tag = finalAttrs.version;
-    hash = "sha256-mdfmCzR9ikXDlDc7FeOITsdbPbz+G66jUrl1BobY+g8=";
+    rev = "5e7353d5f5a25ae37943bfe14ffb7930be6f96f5";
+    hash = "sha256-IR8Ljkw+VlYuUGUAwcafcGZ6tCelyfP2bbzjpGsq3Ik=";
   };
 
   patches = [
     # See https://github.com/elementary/session-settings/issues/88 for gnome-keyring.
-    # See https://github.com/elementary/session-settings/issues/82 for onboard.
     ./no-autostart.patch
   ];
 

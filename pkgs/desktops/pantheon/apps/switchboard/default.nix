@@ -16,15 +16,15 @@
   wrapGAppsHook4,
 }:
 
-stdenv.mkDerivation rec {
+stdenv.mkDerivation {
   pname = "switchboard";
-  version = "8.0.3";
+  version = "8.0.3-unstable-2026-08-24"; # nixpkgs-update: no auto update
 
   src = fetchFromGitHub {
     owner = "elementary";
     repo = "switchboard";
-    rev = version;
-    hash = "sha256-pVXcY/QSjgBcTr0sFQnPxICoQ0tpy2fEJ687zHEDXA0=";
+    rev = "5fc894160388f8edb57e4562d2fae5addcf58077";
+    hash = "sha256-Ojc7LQcTaGlZNsSyjM3QX9ZQ5Mb0SwASWUjdu/DUIkg=";
   };
 
   nativeBuildInputs = [

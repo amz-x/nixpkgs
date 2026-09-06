@@ -19,13 +19,13 @@
 
 stdenv.mkDerivation (finalAttrs: {
   pname = "elementary-maps";
-  version = "8.1.0";
+  version = "8.1.0-unstable-2026-08-03";
 
   src = fetchFromGitHub {
     owner = "elementary";
     repo = "maps";
-    tag = finalAttrs.version;
-    hash = "sha256-tS8UnW/oNjLaUZ1XgGuAmeMrHEa2jbtBc0xMcTKki1k=";
+    rev = "bdd2777be4e1a168b7284320d6a635daef2880b1";
+    hash = "sha256-x83o4Q/MlVjAAFpo5Yja0hqavbk0nwOr93qwqBu58sQ=";
   };
 
   strictDeps = true;

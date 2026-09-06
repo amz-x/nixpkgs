@@ -20,7 +20,7 @@
 
 stdenv.mkDerivation rec {
   pname = "granite";
-  version = "7.8.1";
+  version = "7.8.1"; # nixpkgs-update: no auto update
 
   outputs = [
     "out"

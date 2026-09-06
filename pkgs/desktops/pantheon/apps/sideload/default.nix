@@ -17,15 +17,16 @@
   wrapGAppsHook4,
 }:
 
-stdenv.mkDerivation rec {
+stdenv.mkDerivation {
   pname = "sideload";
-  version = "6.3.1";
+  version = "6.3.1-unstable-2026-07-25";
 
+  # nixpkgs-update: no auto update
   src = fetchFromGitHub {
     owner = "elementary";
     repo = "sideload";
-    tag = version;
-    hash = "sha256-mFaMKY4SdnSdRsHy5vIbJFdMx2FGxYCWmSAWkb99yUI=";
+    rev = "aa4ede08d3c2893cc85006d92ef311af7cfe0ab3";
+    hash = "sha256-SstAqmuCBa05UHRAKGhmO9sd71176VK8a951gO+nG14=";
   };
 
   nativeBuildInputs = [
