@@ -12,15 +12,15 @@
   librsvg,
 }:
 
-stdenvNoCC.mkDerivation rec {
+stdenvNoCC.mkDerivation {
   pname = "elementary-icon-theme";
-  version = "9.0.0";
+  version = "9.0.0-unstable-2026-08-26"; # nixpkgs-update: no auto update
 
   src = fetchFromGitHub {
     owner = "elementary";
     repo = "icons";
-    tag = version;
-    hash = "sha256-WrZxhr7ybIx9CK5zG5Fq6udPt+0HRQIPSwxkCF2tPps=";
+    rev = "91a1b73f6ef3a4f6bf2ec4e933242e14c82524c0";
+    hash = "sha256-aAKGmB6A5T5uf2hqGeTZmrI+LtA4CfQA7weO2UqlmMY=";
   };
 
   nativeBuildInputs = [
@@ -42,14 +42,6 @@ stdenvNoCC.mkDerivation rec {
     "-Dvolume_icons=false" # Tries to install some icons to /
     "-Dpalettes=false" # Don't install gimp and inkscape palette files
   ];
-
-  postPatch = ''
-    # Upstream removed the non-fd.o office-calendar icons but left these
-    # alias symlinks dangling (elementary/icons#1435).
-    rm -f apps/16/calendar.svg \
-      mimes/symbolic/text-calendar-symbolic.svg \
-      mimes/symbolic/vcalendar-symbolic.svg
-  '';
 
   postFixup = "gtk-update-icon-cache $out/share/icons/elementary";
 

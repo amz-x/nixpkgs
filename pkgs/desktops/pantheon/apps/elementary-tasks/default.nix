@@ -7,29 +7,32 @@
   ninja,
   pkg-config,
   vala,
-  wrapGAppsHook3,
+  wrapGAppsHook4,
   clutter-gtk,
   evolution-data-server,
-  granite,
+  granite7,
   geoclue2,
   geocode-glib_2,
-  gtk3,
+  gtk4,
+  libadwaita,
   libchamplain_libsoup3,
   libgee,
   libhandy,
   libical,
-  libportal-gtk3,
+  libportal-gtk4,
+  libshumate,
 }:
 
-stdenv.mkDerivation rec {
+stdenv.mkDerivation {
   pname = "elementary-tasks";
-  version = "6.3.3";
+  version = "6.3.3-unstable-2026-08-03";
 
+  # nixpkgs-update: no auto update
   src = fetchFromGitHub {
     owner = "elementary";
     repo = "tasks";
-    rev = version;
-    hash = "sha256-xOMS4Zwfl7TLHvm8Zn6wQ4ZoMg+Yuci+cTpUVG+liss=";
+    rev = "cb85f96df82017912aac0c539267f99b575a28c5";
+    hash = "sha256-vewt+A3s9LMtOqyrTTyk2e2B3uLoe5Iqy2zQrMvCWrk=";
   };
 
   nativeBuildInputs = [
@@ -37,21 +40,23 @@ stdenv.mkDerivation rec {
     ninja
     pkg-config
     vala
-    wrapGAppsHook3
+    wrapGAppsHook4
   ];
 
   buildInputs = [
     clutter-gtk
     evolution-data-server
-    granite
+    granite7
     geoclue2
     geocode-glib_2
-    gtk3
+    gtk4
+    libadwaita
     libchamplain_libsoup3
     libgee
     libhandy
     libical
-    libportal-gtk3
+    libportal-gtk4
+    libshumate
   ];
 
   passthru = {

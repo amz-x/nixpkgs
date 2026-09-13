@@ -16,15 +16,16 @@
   switchboard,
 }:
 
-stdenv.mkDerivation rec {
+stdenv.mkDerivation {
   pname = "switchboard-plug-display";
-  version = "8.0.3";
+  version = "8.0.3-unstable-2026-08-18";
 
+  # nixpkgs-update: no auto update
   src = fetchFromGitHub {
     owner = "elementary";
     repo = "settings-display";
-    rev = version;
-    sha256 = "sha256-5erlD+w9KN1/mbajdnQyevFm+uYavLYx7NsIbf85BVc=";
+    rev = "9e50d866482b7fecd29db3c8654ef74b32dd532b";
+    sha256 = "sha256-GbIJjcV10BYaOb5yv4Kos6qJCjmvzFiraGYj/yhU9Gc=";
   };
 
   nativeBuildInputs = [

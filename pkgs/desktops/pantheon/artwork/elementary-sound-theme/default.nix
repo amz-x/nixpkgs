@@ -8,15 +8,15 @@
   pkg-config,
 }:
 
-stdenv.mkDerivation rec {
+stdenv.mkDerivation {
   pname = "elementary-sound-theme";
-  version = "1.1.0";
+  version = "1.1.0-unstable-2026-04-19"; # nixpkgs-update: no auto update
 
   src = fetchFromGitHub {
     owner = "elementary";
     repo = "sound-theme";
-    rev = version;
-    sha256 = "sha256-fR6gtKx9J6o2R1vQZ5yx4kEX3Ak+q8I6hRVMZzyB2E8=";
+    rev = "06e773b65939ca347bb70ad53f7d8e30e2db6c9e";
+    sha256 = "sha256-KMMTVxlVQEgOt2EPKwHZRIkbBLuriC9VQLQGgPzNEq0=";
   };
 
   nativeBuildInputs = [

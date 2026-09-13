@@ -1,0 +1,33 @@
+diff --git a/src/WindowManager.vala b/src/WindowManager.vala
+index 52b6af9..b3320a8 100644
+--- a/src/WindowManager.vala
++++ b/src/WindowManager.vala
+@@ -89,6 +89,8 @@ namespace Gala {
+ 
+         private WindowMenuManager window_menu_manager;
+ 
++        private ManagedClient? greeter_client;
++
+         private NotificationStack notification_stack;
+ 
+         private LockScreenManager lock_screen_manager;
+@@ -291,6 +293,19 @@ namespace Gala {
+                 Systemd.Daemon.notify (true, "READY=1");
+ #endif
+                 display.get_context ().notify_ready ();
++
++                if (SessionSettings.is_greeter ()) {
++                    // Nothing else starts the greeter's login UI for us
++                    // when we are the one being exec'd directly as the
++                    // greeter's Wayland compositor. Unlike the login UI,
++                    // the fake session manager shim and settings daemon
++                    // that the old standalone greeter-compositor also
++                    // spawned aren't needed here: they end up racing the
++                    // real systemd user session's own instances for the
++                    // same D-Bus names once it comes up alongside us.
++                    greeter_client = new ManagedClient (display, { "io.elementary.greeter" });
++                }
++
+                 return GLib.Source.REMOVE;
+             });
+         }

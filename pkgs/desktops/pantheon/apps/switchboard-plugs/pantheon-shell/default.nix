@@ -2,6 +2,7 @@
   lib,
   stdenv,
   fetchFromGitHub,
+  fetchpatch,
   nix-update-script,
   meson,
   ninja,
@@ -23,16 +24,26 @@
   gettext,
 }:
 
-stdenv.mkDerivation rec {
+stdenv.mkDerivation {
   pname = "switchboard-plug-pantheon-shell";
-  version = "8.3.0";
+  version = "8.3.0-unstable-2026-09-04"; # nixpkgs-update: no auto update
 
   src = fetchFromGitHub {
     owner = "elementary";
     repo = "settings-desktop";
-    tag = version;
-    hash = "sha256-qczv+G0v47SiMsLlWjDPK0ZY4J+V/CXe/l7b6pWG+WY=";
+    rev = "b7c3c2a0a44fe79804e4b0c8dd84e5ed49339254";
+    hash = "sha256-g5nm7LQmWEzzu4RLapqWwXXwZXsLVPiTl9+F8RLrAsw=";
   };
+
+  # Fix crash when opening the Desktop settings page: upstream binds to a
+  # gsettings key named "reduce-motion", but elementary-settings-daemon's
+  # io.elementary.settings-daemon.a11y schema actually names the key
+  # "reduced-motion", so g_settings_bind aborts with a fatal GLib error.
+  # https://github.com/elementary/settings-desktop/blob/9a4d142c0381c0d54e71eac855d7fc8d640a0174/src/Views/Appearance.vala#L296
+  postPatch = ''
+    substituteInPlace src/Views/Appearance.vala \
+      --replace-fail '"reduce-motion"' '"reduced-motion"'
+  '';
 
   nativeBuildInputs = [
     gettext
@@ -44,10 +55,10 @@ stdenv.mkDerivation rec {
 
   buildInputs = [
     elementary-settings-daemon
-    gnome-settings-daemon
     gala
     gexiv2_0_10
     glib
+    gnome-settings-daemon
     granite7
     gtk4
     libadwaita

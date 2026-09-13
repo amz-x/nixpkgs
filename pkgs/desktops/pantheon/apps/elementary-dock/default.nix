@@ -18,7 +18,7 @@
 
 stdenv.mkDerivation (finalAttrs: {
   pname = "elementary-dock";
-  version = "8.3.3";
+  version = "8.3.3-unstable-2026-08-27"; # nixpkgs-update: no auto update
 
   outputs = [
     "out"
@@ -28,8 +28,8 @@ stdenv.mkDerivation (finalAttrs: {
   src = fetchFromGitHub {
     owner = "elementary";
     repo = "dock";
-    rev = finalAttrs.version;
-    hash = "sha256-13wXBqN4vovmiXXQyciy4yxIrByuLBvm+ypg2MLVMB4=";
+    rev = "16940666b5d89bc39f718f8eb6ffc44f4772aea2";
+    hash = "sha256-bRLxuKEJhXG2ZOhi1RJMAKg7VLhoBDCcVfeuSTBX1hw=";
   };
 
   depsBuildBuild = [ pkg-config ];

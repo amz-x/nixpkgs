@@ -8,8 +8,8 @@
   ninja,
   replaceVars,
   vala,
-  gtk3,
-  granite,
+  gtk4,
+  granite7,
   libxml2,
   wingpanel,
   libgee,
@@ -18,15 +18,15 @@
   ibus,
 }:
 
-stdenv.mkDerivation rec {
+stdenv.mkDerivation {
   pname = "wingpanel-indicator-keyboard";
-  version = "2.4.2";
+  version = "2.4.2-unstable-2026-09-12"; # nixpkgs-update: no auto update
 
   src = fetchFromGitHub {
     owner = "elementary";
-    repo = "wingpanel-indicator-keyboard";
-    rev = version;
-    sha256 = "sha256-vPQ+Bt7ggeT3Zzsvbie8Wpu3D2WMEIh8GDOI3frnedM=";
+    repo = "panel-keyboard";
+    rev = "10dd7c4f1b3b1439bf7c6bdbacb29533943ccdf6";
+    sha256 = "sha256-WJpJEid0JcDKLebMZwBXE23ZlFsf4hPMA3YCEgiT7gQ=";
   };
 
   patches = [
@@ -44,8 +44,8 @@ stdenv.mkDerivation rec {
   ];
 
   buildInputs = [
-    granite
-    gtk3
+    granite7
+    gtk4
     ibus
     libgee
     wingpanel
@@ -58,7 +58,7 @@ stdenv.mkDerivation rec {
 
   meta = {
     description = "Keyboard Indicator for Wingpanel";
-    homepage = "https://github.com/elementary/wingpanel-indicator-keyboard";
+    homepage = "https://github.com/elementary/panel-keyboard";
     license = lib.licenses.gpl3Plus;
     platforms = lib.platforms.linux;
     teams = [ lib.teams.pantheon ];
