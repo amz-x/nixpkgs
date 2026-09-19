@@ -1,0 +1,27 @@
+diff --git a/src/PantheonShell.vala b/src/PantheonShell.vala
+index 2d187916..0856186b 100644
+--- a/src/PantheonShell.vala
++++ b/src/PantheonShell.vala
+@@ -316,7 +316,21 @@ namespace Gala {
+             return;
+         }
+ 
+-        window.focus (window.get_display ().get_current_time ());
++        // get_current_time() just returns MetaDisplay's cached
++        // "current_time" field, not a live timestamp -- it only advances
++        // when mutter processes certain input events, so it can lag
++        // behind. meta_display_set_input_focus() rejects a focus request
++        // outright (silently, no error) if the timestamp it's given is
++        // older than the display's last_user_time, which *does* keep
++        // advancing on every genuine interaction anywhere else (e.g. the
++        // user clicking into a different, unrelated application while
++        // this panel/widget's own focus() request is in flight). Once
++        // that happens, this call becomes a silent no-op: no focus, no
++        // wl_keyboard.enter, nothing -- which is why a panel surface can
++        // end up with a popup grabbed but never actually focused.
++        // get_current_time_roundtrip() queries the live monotonic clock
++        // instead, so it's never stale.
++        window.focus (window.get_display ().get_current_time_roundtrip ());
+     }
+ 
+     internal static void set_size (Wl.Client client, Wl.Resource resource, int width, int height) {

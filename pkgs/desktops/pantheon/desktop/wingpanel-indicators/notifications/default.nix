@@ -7,23 +7,24 @@
   meson,
   ninja,
   vala,
-  gtk3,
-  granite,
+  gtk4,
+  granite7,
   wingpanel,
+  libadwaita,
   libgee,
   libhandy,
   elementary-notifications,
 }:
 
-stdenv.mkDerivation rec {
+stdenv.mkDerivation {
   pname = "wingpanel-indicator-notifications";
-  version = "7.1.1";
+  version = "7.1.1-unstable-2026-09-12"; # nixpkgs-update: no auto update
 
   src = fetchFromGitHub {
     owner = "elementary";
-    repo = "wingpanel-indicator-notifications";
-    rev = version;
-    sha256 = "sha256-fuC9ldDjKuy1kBeFOAIZ/Onhl2o45Xj+YjSrfYz1xvw=";
+    repo = "panel-notifications";
+    rev = "486eaead03826d066cea6409f1f57e98508d66c7";
+    sha256 = "sha256-JyQtnsrC7EYskHBIfGi0NTuBIt+jeEG0amy2NCaXXAs=";
   };
 
   nativeBuildInputs = [
@@ -35,8 +36,9 @@ stdenv.mkDerivation rec {
 
   buildInputs = [
     elementary-notifications
-    granite
-    gtk3
+    granite7
+    gtk4
+    libadwaita
     libgee
     libhandy
     wingpanel
@@ -48,7 +50,7 @@ stdenv.mkDerivation rec {
 
   meta = {
     description = "Notifications Indicator for Wingpanel";
-    homepage = "https://github.com/elementary/wingpanel-indicator-notifications";
+    homepage = "https://github.com/elementary/panel-notifications";
     license = lib.licenses.lgpl21Plus;
     platforms = lib.platforms.linux;
     teams = [ lib.teams.pantheon ];

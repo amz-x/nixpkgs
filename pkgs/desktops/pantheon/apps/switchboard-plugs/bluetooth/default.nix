@@ -18,15 +18,15 @@
   wingpanel-indicator-bluetooth,
 }:
 
-stdenv.mkDerivation rec {
+stdenv.mkDerivation {
   pname = "switchboard-plug-bluetooth";
-  version = "8.0.2";
+  version = "8.0.2-unstable-2026-09-05"; # nixpkgs-update: no auto update
 
   src = fetchFromGitHub {
     owner = "elementary";
     repo = "settings-bluetooth";
-    rev = version;
-    hash = "sha256-D2kigdGdmDtFWt/hldzHm+QqlGl6RBExhcdurLtCM1Q=";
+    rev = "84fd0b4751b7f17888869904c94f200a3b4f1047";
+    hash = "sha256-C0oKVcJ5ry8XNg3v3DaDxeEgS9dpFD0fIftW1PENhII=";
   };
 
   nativeBuildInputs = [

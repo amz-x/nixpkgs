@@ -17,23 +17,23 @@
   glib,
   gnome-settings-daemon,
   gobject-introspection,
-  gtk3,
-  granite,
+  gtk4,
+  granite7,
   libgee,
   packagekit,
   systemd,
-  wrapGAppsHook3,
+  wrapGAppsHook4,
 }:
 
-stdenv.mkDerivation rec {
+stdenv.mkDerivation {
   pname = "elementary-settings-daemon";
-  version = "8.5.0";
+  version = "8.5.0-unstable-2026-08-30"; # nixpkgs-update: no auto update
 
   src = fetchFromGitHub {
     owner = "elementary";
     repo = "settings-daemon";
-    tag = version;
-    hash = "sha256-npHSj+Zq0fqWVjr5kl/C96gfziLMNOeXxCUgxFGht/s=";
+    rev = "ccb3ec6e978985a945aa8a255809a7735e0e59fe";
+    hash = "sha256-DFPpLcAjiHhC/J6jJ/5PvrFtCCylZdIXZSMxejcBrWg=";
   };
 
   nativeBuildInputs = [
@@ -43,7 +43,7 @@ stdenv.mkDerivation rec {
     ninja
     pkg-config
     vala
-    wrapGAppsHook3
+    wrapGAppsHook4
   ];
 
   buildInputs = [
@@ -55,8 +55,8 @@ stdenv.mkDerivation rec {
     gexiv2_0_10
     glib
     gnome-settings-daemon # org.gnome.settings-daemon.* gschema
-    gtk3
-    granite
+    gtk4
+    granite7
     libgee
     packagekit
     systemd

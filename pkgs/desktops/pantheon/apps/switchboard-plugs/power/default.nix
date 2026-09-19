@@ -9,6 +9,9 @@
   vala,
   libadwaita,
   libgee,
+  libgtop,
+  libnotify,
+  libudev-zero,
   gettext,
   gnome-settings-daemon,
   granite7,
@@ -17,18 +20,19 @@
   dbus,
   polkit,
   switchboard,
+  wingpanel,
   wingpanel-indicator-power,
 }:
 
-stdenv.mkDerivation rec {
+stdenv.mkDerivation {
   pname = "switchboard-plug-power";
-  version = "8.1.0";
+  version = "8.1.0-unstable-2026-08-28"; # nixpkgs-update: no auto update
 
   src = fetchFromGitHub {
     owner = "elementary";
     repo = "settings-power";
-    tag = version;
-    hash = "sha256-JfOLGDS2/Qa6RmEfiDBZfeT+dM4NN4N2NoXRNJ4Q+Es=";
+    rev = "0c37ddfe683241bdbe43ad84ff73a5cd19f3587e";
+    hash = "sha256-2Nsc8VacHXOz4X33o2x03HmcsZfJ+lBRA07NdA08fUE=";
   };
 
   nativeBuildInputs = [
@@ -47,8 +51,12 @@ stdenv.mkDerivation rec {
     gtk4
     libadwaita
     libgee
+    libgtop
+    libnotify
+    libudev-zero
     polkit
     switchboard
+    wingpanel
     wingpanel-indicator-power # settings schema
   ];
 

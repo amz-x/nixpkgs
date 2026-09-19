@@ -15,15 +15,15 @@
   libgee,
 }:
 
-stdenv.mkDerivation rec {
+stdenv.mkDerivation {
   pname = "elementary-calculator";
-  version = "8.0.1";
+  version = "8.0.1-unstable-2026-09-13"; # nixpkgs-update: no auto update
 
   src = fetchFromGitHub {
     owner = "elementary";
     repo = "calculator";
-    rev = version;
-    sha256 = "sha256-XBOe3v6lKoICgEh78JoVH0Ojs8tr5PxKHQGk63MX6pQ=";
+    rev = "a908dd1a5b70a737ec6794ab53c79600082eec2f";
+    sha256 = "sha256-sIJiV7gZBiqBkNNNfw0k9JT0j9vishwXcublePn90Fw=";
   };
 
   nativeBuildInputs = [
