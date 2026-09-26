@@ -1,0 +1,33 @@
+diff --git a/src/Background/BackgroundContainer.vala b/src/Background/BackgroundContainer.vala
+index 8c29963..85762fd 100644
+--- a/src/Background/BackgroundContainer.vala
++++ b/src/Background/BackgroundContainer.vala
+@@ -11,12 +11,19 @@ public class Gala.BackgroundContainer : Meta.BackgroundGroup {
+ 
+     public Meta.Display display { get; construct; }
+ 
++    // Held as a strong reference (rather than re-derived from display on
++    // demand) so it's still safe to disconnect from in our destructor even
++    // if the backend is itself already mid-teardown by then, e.g. when the
++    // whole Meta.Context is being disposed on process exit (as happens for
++    // the greeter's gala instance once the user logs in).
++    private Meta.MonitorManager monitor_manager;
++
+     public BackgroundContainer (Meta.Display display) {
+         Object (display: display);
+     }
+ 
+     construct {
+-        unowned var monitor_manager = display.get_context ().get_backend ().get_monitor_manager ();
++        monitor_manager = display.get_context ().get_backend ().get_monitor_manager ();
+         monitor_manager.monitors_changed.connect (update);
+ 
+         reactive = true;
+@@ -40,7 +47,6 @@ public class Gala.BackgroundContainer : Meta.BackgroundGroup {
+     }
+ 
+     ~BackgroundContainer () {
+-        unowned var monitor_manager = display.get_context ().get_backend ().get_monitor_manager ();
+         monitor_manager.monitors_changed.disconnect (update);
+     }
+ 

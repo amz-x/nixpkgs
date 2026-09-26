@@ -2,13 +2,13 @@
   lib,
   stdenv,
   fetchFromGitHub,
-  fetchpatch,
   nix-update-script,
   pkg-config,
   meson,
   ninja,
   vala,
   gtk3,
+  gtk4,
   libxml2,
   libhandy,
   libportal-gtk3,
@@ -25,22 +25,19 @@
 
 stdenv.mkDerivation (finalAttrs: {
   pname = "elementary-mail";
-  version = "8.0.1";
+  version = "8.0.1-unstable-2026-08-30"; # nixpkgs-update: no auto update
 
   src = fetchFromGitHub {
     owner = "elementary";
     repo = "mail";
-    tag = finalAttrs.version;
-    hash = "sha256-6DY8pJXPXz6uaBKR/qLxYpAQfpzlzi/wtj1douhSjpQ=";
+    rev = "7cb59744aec6b1d638e344b17bb33208825c1ce2";
+    hash = "sha256-Q0FvKBbUv/9yuRmaGuRP1NK9P54706CxsIF5gNWSJNo=";
   };
 
   patches = [
-    # Adapt to libcamel API changes in 3.57.1
+    # Adapt to libcamel API changes in 3.57.1, rebased onto our pinned rev.
     # https://github.com/elementary/mail/pull/1023
-    (fetchpatch {
-      url = "https://github.com/elementary/mail/commit/8cb5bb87ceca9000c2a556bafeb059b9f1cbf2f1.patch";
-      hash = "sha256-NFZVvKJyPTV+lRcefTIgm2jOmCfrY+TlawDYzGTBd7Y=";
-    })
+    ./libcamel-3.57.1.patch
   ];
 
   nativeBuildInputs = [
@@ -59,6 +56,7 @@ stdenv.mkDerivation (finalAttrs: {
     glib-networking
     granite
     gtk3
+    gtk4
     libgee
     libhandy
     libportal-gtk3
