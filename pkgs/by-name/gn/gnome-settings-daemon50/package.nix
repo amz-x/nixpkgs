@@ -1,53 +1,52 @@
 {
-  stdenv,
-  lib,
-  replaceVars,
-  buildPackages,
-  fetchurl,
-  meson,
-  ninja,
-  pkg-config,
-  perl,
-  gettext,
-  gtk3,
-  glib,
-  libnotify,
-  libgnomekbd,
-  libpulseaudio,
   alsa-lib,
-  libcanberra-gtk3,
-  upower,
+  bashNonInteractive,
+  buildPackages,
   colord,
-  libgweather,
-  polkit,
-  gsettings-desktop-schemas,
+  cups,
+  fetchurl,
+  fontconfig,
+  gcr_4,
   geoclue2,
-  systemd,
+  geocode-glib_2,
+  gettext,
+  glib,
+  gnome-desktop,
+  gnome-session-ctl,
+  gsettings-desktop-schemas,
+  lib,
+  libcanberra,
+  libgnomekbd,
   libgudev,
-  libwacom,
-  libxslt,
-  libxml2,
+  libgweather,
+  libnotify,
+  libpulseaudio,
+  libx11,
+  libxfixes,
+  meson,
   modemmanager,
   networkmanager,
-  gnome-desktop,
-  geocode-glib_2,
-  docbook_xsl,
-  wrapGAppsHook3,
-  python3,
+  ninja,
+  perl,
+  pkg-config,
+  polkit,
+  replaceVars,
+  stdenv,
+  systemd,
   tzdata,
-  gcr_4,
-  gnome-session-ctl,
   udevCheckHook,
+  upower,
+  wrapGAppsNoGuiHook,
   withSystemd ? lib.meta.availableOn stdenv.hostPlatform systemd,
 }:
 
 stdenv.mkDerivation (finalAttrs: {
   pname = "gnome-settings-daemon";
-  version = "48.1";
+  version = "50.1";
 
   src = fetchurl {
     url = "mirror://gnome/sources/gnome-settings-daemon/${lib.versions.major finalAttrs.version}/gnome-settings-daemon-${finalAttrs.version}.tar.xz";
-    hash = "sha256-OGCi6iFNy8tmAK56HjNYpTiSFQh7w+SkfO4/h7ruBi4=";
+    hash = "sha256-3SyXMJFPDs7KAindiowpQKV93rCAJDRVjUsWTXnP4Fw=";
   };
 
   patches = [
@@ -65,41 +64,40 @@ stdenv.mkDerivation (finalAttrs: {
   ];
 
   nativeBuildInputs = [
-    meson
-    ninja
-    pkg-config
-    perl
     gettext
     glib
-    libxml2
-    libxslt
-    docbook_xsl
-    wrapGAppsHook3
-    python3
+    meson
+    ninja
+    perl
+    pkg-config
     udevCheckHook
+    wrapGAppsNoGuiHook
   ];
 
   buildInputs = [
-    gtk3
+    alsa-lib
+    bashNonInteractive
+    colord
+    cups
+    fontconfig
+    gcr_4
+    geoclue2
+    geocode-glib_2
     glib
+    gnome-desktop
     gsettings-desktop-schemas
+    libcanberra
+    libgudev
+    libgweather
+    libgnomekbd
+    libnotify
+    libpulseaudio
+    libx11
+    libxfixes
     modemmanager
     networkmanager
-    libnotify
-    libgnomekbd # for org.gnome.libgnomekbd.keyboard schema
-    gnome-desktop
-    libpulseaudio
-    alsa-lib
-    libcanberra-gtk3
-    upower
-    colord
-    libgweather
     polkit
-    geocode-glib_2
-    geoclue2
-    libgudev
-    libwacom
-    gcr_4
+    upower
   ]
   ++ lib.optionals withSystemd [
     systemd

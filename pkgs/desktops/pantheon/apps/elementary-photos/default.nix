@@ -24,15 +24,15 @@
   wrapGAppsHook3,
 }:
 
-stdenv.mkDerivation rec {
+stdenv.mkDerivation {
   pname = "elementary-photos";
-  version = "8.0.2";
+  version = "8.0.2-unstable-2026-09-23";
 
   src = fetchFromGitHub {
     owner = "elementary";
     repo = "photos";
-    rev = version;
-    sha256 = "sha256-weJ061ofCwOzq5gFRNxoW1GgSkEkr68cBNbyBfgCECc=";
+    rev = "58f178f7f9df3aa39a67ab4a6991afc3cb46d228";
+    sha256 = "sha256-XXtVF26nrehCz56/xoYGAhntQGUPzSOECpy3uHHlA20=";
   };
 
   nativeBuildInputs = [

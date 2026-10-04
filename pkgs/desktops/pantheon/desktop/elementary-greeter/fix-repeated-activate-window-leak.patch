@@ -1,0 +1,22 @@
+diff --git a/src/Application.vala b/src/Application.vala
+index f16745c..22d94f1 100644
+--- a/src/Application.vala
++++ b/src/Application.vala
+@@ -102,6 +102,17 @@ public class Greeter.Application : Gtk.Application {
+     }
+ 
+     public override void activate () {
++        // activate() gets called repeatedly (roughly once a second, for as
++        // long as the greeter runs) rather than just once at startup --
++        // without this guard every call created a brand-new MainWindow
++        // (with its own full set of user cards) on top of the existing
++        // one, never destroying the old ones: a runaway window leak that
++        // also visibly doubled (and kept redoubling) the login UI.
++        if (active_window != null) {
++            active_window.present ();
++            return;
++        }
++
+         add_window (new Greeter.MainWindow (lightdm_greeter));
+         active_window.present ();
+     }

@@ -16,15 +16,15 @@
   appstream,
 }:
 
-stdenv.mkDerivation rec {
+stdenv.mkDerivation {
   pname = "elementary-feedback";
-  version = "8.1.1";
+  version = "8.1.1-unstable-2026-07-25"; # nixpkgs-update: no auto update
 
   src = fetchFromGitHub {
     owner = "elementary";
     repo = "feedback";
-    tag = version;
-    hash = "sha256-vg692o0OkEQqtKSLZDLztL/D0YO5WUOBVKe4RDxSEFM=";
+    rev = "69f0ff4d695f656d545b87591641e303b1f5afb0";
+    hash = "sha256-Fhdn3BHL1fyPpDLXN50pLEIiZOXvj0kjUL8xHMLL/64=";
   };
 
   patches = [

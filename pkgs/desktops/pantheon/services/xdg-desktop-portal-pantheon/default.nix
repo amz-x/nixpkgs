@@ -21,13 +21,13 @@
 
 stdenv.mkDerivation {
   pname = "xdg-desktop-portal-pantheon";
-  version = "8.2.0-unstable-2026-06-04";
+  version = "8.2.0-unstable-2026-10-02"; # nixpkgs-update: no auto update
 
   src = fetchFromGitHub {
     owner = "elementary";
     repo = "portals";
-    rev = "c5f6fa1179bfa51429ddf4b2d268c7f2295dfff8";
-    hash = "sha256-gHWvY205Jy69LpNtqCr+prtalf7bSVZ971sGbhMuqnA=";
+    rev = "d4b0ce85cf5a53df00d40905dc00f605ff009c26";
+    hash = "sha256-4ZPoj6oiW9ulDuEluyaDY5g6vwteALxg860dMeEl85U=";
   };
 
   nativeBuildInputs = [

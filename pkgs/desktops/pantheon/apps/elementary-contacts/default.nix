@@ -2,51 +2,50 @@
   stdenv,
   lib,
   fetchFromGitHub,
-  glib,
   meson,
   ninja,
   pkg-config,
   vala,
+  wayland-scanner,
   wrapGAppsHook4,
-  geoclue2,
-  geocode-glib_2,
+  folks,
+  glib,
   granite7,
   gtk4,
   libadwaita,
-  libshumate,
+  wayland,
   nix-update-script,
 }:
 
 stdenv.mkDerivation (finalAttrs: {
-  pname = "elementary-maps";
-  version = "8.1.0-unstable-2026-08-03";
+  pname = "elementary-contacts";
+  version = "0.0.0-unstable-2026-08-17"; # nixpkgs-update: no auto update
 
   src = fetchFromGitHub {
     owner = "elementary";
-    repo = "maps";
-    rev = "bdd2777be4e1a168b7284320d6a635daef2880b1";
-    hash = "sha256-x83o4Q/MlVjAAFpo5Yja0hqavbk0nwOr93qwqBu58sQ=";
+    repo = "contacts";
+    rev = "ec4de391bba8e59feef495bef2031e2b38c6a0f0";
+    hash = "sha256-uoBWso32y+m/cSfDZl0CGYSFc81a/p0FurpVgrhP32o=";
   };
 
-  strictDeps = true;
+  depsBuildBuild = [ pkg-config ];
 
   nativeBuildInputs = [
-    glib
     meson
     ninja
     pkg-config
     vala
+    wayland-scanner
     wrapGAppsHook4
   ];
 
   buildInputs = [
-    geoclue2
-    geocode-glib_2
+    folks
     glib
     granite7
     gtk4
     libadwaita
-    libshumate
+    wayland
   ];
 
   passthru = {
@@ -54,11 +53,11 @@ stdenv.mkDerivation (finalAttrs: {
   };
 
   meta = {
-    homepage = "https://github.com/elementary/maps";
-    description = "Map viewer designed for elementary OS";
+    description = "See and get in touch with your contacts";
+    homepage = "https://github.com/elementary/contacts";
     license = lib.licenses.gpl3Plus;
     platforms = lib.platforms.linux;
     teams = [ lib.teams.pantheon ];
-    mainProgram = "io.elementary.maps";
+    mainProgram = "io.elementary.contacts";
   };
 })

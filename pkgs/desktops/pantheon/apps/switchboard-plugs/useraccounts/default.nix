@@ -6,38 +6,33 @@
   meson,
   ninja,
   pkg-config,
-  replaceVars,
   vala,
+  accountsservice,
   libadwaita,
   libgee,
+  libpwquality,
   gettext,
+  gnome-desktop,
   granite7,
   gtk4,
-  networkmanager,
-  networkmanagerapplet,
-  libnma-gtk4,
+  glib,
+  polkit,
   switchboard,
 }:
 
 stdenv.mkDerivation {
-  pname = "switchboard-plug-network";
-  version = "8.2.0-unstable-2026-09-22";
+  pname = "switchboard-plug-useraccounts";
+  version = "8.0.1-unstable-2026-09-12"; # nixpkgs-update: no auto update
 
   src = fetchFromGitHub {
     owner = "elementary";
-    repo = "switchboard-plug-network";
-    rev = "9bc171b06a17d5af83e6339b2a79a2ad42485d3a";
-    hash = "sha256-unGQ6HGTCz/dxc6ygRe2+9Vy+R2tIFnnJz++x0AwVGE=";
+    repo = "settings-useraccounts";
+    rev = "f71056ec21dfea751a54a5f8fe1ecf5d9ea1971c";
+    hash = "sha256-U5r/hLWgZoTc7wS0SDwA+A19jQWzqD35Jcv2VYQSF40=";
   };
 
-  patches = [
-    (replaceVars ./fix-paths.patch {
-      inherit networkmanagerapplet;
-    })
-  ];
-
   nativeBuildInputs = [
-    gettext
+    gettext # msgfmt
     meson
     ninja
     pkg-config
@@ -45,24 +40,25 @@ stdenv.mkDerivation {
   ];
 
   buildInputs = [
+    accountsservice
+    glib
+    gnome-desktop
     granite7
     gtk4
     libadwaita
     libgee
-    networkmanager
-    libnma-gtk4
+    libpwquality
+    polkit
     switchboard
   ];
-
-  strictDeps = true;
 
   passthru = {
     updateScript = nix-update-script { };
   };
 
   meta = {
-    description = "Switchboard Networking Plug";
-    homepage = "https://github.com/elementary/switchboard-plug-network";
+    description = "Switchboard User Accounts Settings";
+    homepage = "https://github.com/elementary/settings-useraccounts";
     license = lib.licenses.gpl3Plus;
     platforms = lib.platforms.linux;
     teams = [ lib.teams.pantheon ];

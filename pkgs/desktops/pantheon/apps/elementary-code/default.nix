@@ -24,15 +24,15 @@
   ctags,
 }:
 
-stdenv.mkDerivation rec {
+stdenv.mkDerivation {
   pname = "elementary-code";
-  version = "8.4.0";
+  version = "8.4.0-unstable-2026-09-30";
 
   src = fetchFromGitHub {
     owner = "elementary";
     repo = "code";
-    tag = version;
-    hash = "sha256-2ZxYzSBncQMEpYdM75bicMBG5XLtVNLmUu811T4OZS4=";
+    rev = "7b56ffabcd606fa52cd0f4750448ca3566f99b64";
+    hash = "sha256-+su6tgy7MfV8gKWNNA2pbg5RACFDUgJuk2Jt0zgquSM=";
   };
 
   strictDeps = true;

@@ -2,7 +2,6 @@
   lib,
   stdenv,
   fetchFromGitHub,
-  fetchpatch,
   nix-update-script,
   meson,
   ninja,
@@ -19,9 +18,9 @@
   wrapGAppsHook4,
 }:
 
-stdenv.mkDerivation rec {
+stdenv.mkDerivation {
   pname = "granite";
-  version = "7.8.1"; # nixpkgs-update: no auto update
+  version = "7.8.1-unstable-2026-10-02"; # nixpkgs-update: no auto update
 
   outputs = [
     "out"
@@ -31,22 +30,9 @@ stdenv.mkDerivation rec {
   src = fetchFromGitHub {
     owner = "elementary";
     repo = "granite";
-    tag = version;
-    hash = "sha256-Hk5EiTMsSOg2eQQCbILDoibcmfS+4N//4go6rc06Qwc=";
+    rev = "1e966ed531406563538517530f4fcd476fb21daa";
+    hash = "sha256-JUe2KJcKrvHHzv18kYWODz8an7+MaHJmWy/yuQ6d/Gw=";
   };
-
-  patches = [
-    # contractor renamed its D-Bus name from org.elementary.Contractor to
-    # io.elementary.Contractor (elementary/contractor#41), so without this
-    # ContractorProxy finds no service and apps get no contracts, e.g. no
-    # "Compress"/"Extract Here" in Files' context menu.
-    # https://github.com/elementary/granite/pull/1051
-    (fetchpatch {
-      name = "rename-contractor-rdnn.patch";
-      url = "https://github.com/elementary/granite/commit/578369486e204065a714b92fd0c09892223cf2f8.patch";
-      hash = "sha256-W+Px6TnOQUReTnD5If2v/KbJMKXD3HnOvXJbKOuHTiw=";
-    })
-  ];
 
   nativeBuildInputs = [
     gettext
@@ -84,6 +70,6 @@ stdenv.mkDerivation rec {
     license = lib.licenses.lgpl3Plus;
     platforms = lib.platforms.linux;
     teams = [ lib.teams.pantheon ];
-    mainProgram = "granite-7-demo";
+    mainProgram = "granite-9-demo";
   };
 }
