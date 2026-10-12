@@ -25,8 +25,13 @@
     {
       imports = [ ./common/user-account.nix ];
 
-      # Workaround ".gala-wrapped invoked oom-killer"
-      virtualisation.memorySize = 2047;
+      # Workaround ".gala-wrapped invoked oom-killer". The greeter phase
+      # runs a second gala+login UI on top of the real session's own
+      # gala+apps once logged in, and locking the screen (tested below)
+      # briefly runs a *third* gala+greeter instance for the fresh
+      # unlock session on top of that, so give this more headroom than
+      # a single-session Pantheon desktop needs.
+      virtualisation.memorySize = 2048;
 
       services.xserver.enable = true;
       services.desktopManager.pantheon.enable = true;
@@ -52,17 +57,23 @@
       user = nodes.machine.users.users.alice;
     in
     ''
+      import datetime
+
       machine.wait_for_unit("display-manager.service")
 
       with subtest("Test we can see usernames in elementary-greeter"):
           machine.wait_for_text("${user.description}")
-          machine.wait_until_succeeds("pgrep -f io.elementary.greeter-compositor")
+          # Gala is executed directly as the greeter's compositor and spawns
+          # the actual login UI itself; bracket the first letter so pgrep
+          # doesn't match its own invocation (it's run as `bash -c "pgrep
+          # -f ..."`, which contains the pattern in its own cmdline).
+          machine.wait_until_succeeds("pgrep -f '[i]o.elementary.greeter$'")
           # Ensure the password box is focused by clicking it.
           # Workaround for https://github.com/NixOS/nixpkgs/issues/211366.
-          machine.succeed("ydotool mousemove -a 220 275")
+          machine.succeed("ydotool mousemove -a 309 286")
           machine.succeed("ydotool click 0xC0")
           machine.sleep(2)
-          machine.screenshot("elementary_greeter_lightdm")
+          machine.screenshot("greeter")
 
       with subtest("Login with elementary-greeter"):
           machine.send_chars("${user.password}\n")
@@ -120,11 +131,75 @@
           machine.screenshot("multitasking")
           machine.succeed(f"su - ${user.name} -c '{env} {cmd}'")
 
+      with subtest("Archive actions are offered and work via contractor"):
+          # The elementary-files application gets "Compress"/"Extract Here"
+          # from contractor (file-roller-contract) through granite's ContractorProxy,
+          # so these only show up if granite and contractor agree on the D-Bus name.
+          env = "DBUS_SESSION_BUS_ADDRESS=unix:path=/run/user/${toString user.uid}/bus WAYLAND_DISPLAY=wayland-0 XDG_RUNTIME_DIR=/run/user/${toString user.uid}"
+          contractor = "gdbus call --session --dest io.elementary.Contractor --object-path /io/elementary/contractor --method io.elementary.Contractor.ExecuteWithUri"
+          home = "${user.home}"
+          machine.succeed(
+              f"su - ${user.name} -c 'mkdir -p {home}/archives/folder {home}/archives/inner"
+              f" && echo foo > {home}/archives/folder/a.txt && echo bar > {home}/archives/inner/b.txt"
+              f" && tar -czf {home}/archives/archive.tar.gz -C {home}/archives inner && rm -r {home}/archives/inner'"
+          )
+
+          # Passing a file selects it; the menu key opens its context menu.
+          machine.execute(f"su - ${user.name} -c '{env} io.elementary.files {home}/archives/archive.tar.gz >&2 &'")
+          machine.sleep(8)
+          machine.send_key("menu")
+          machine.wait_for_text("Extract Here")
+          machine.screenshot("files_extract_menu")
+          machine.send_key("esc")
+          machine.succeed(f"su - ${user.name} -c '{env} {contractor} io.elementary.contractor.file-roller-extract-here file://{home}/archives/archive.tar.gz'")
+          machine.wait_until_succeeds(f"grep -q bar {home}/archives/inner/b.txt")
+
+          # With nothing selected, the background menu acts on the folder itself.
+          machine.execute(f"su - ${user.name} -c '{env} io.elementary.files -n {home}/archives/folder >&2 &'")
+          machine.sleep(8)
+          machine.send_key("menu")
+          machine.wait_for_text("Compress")
+          machine.screenshot("files_compress_menu")
+          machine.send_key("esc")
+          machine.succeed(f"su - ${user.name} -c '{env} {contractor} io.elementary.contractor.file-roller-compress file://{home}/archives/folder'")
+
+          # File Roller's dialog defaults to folder.tar.gz next to the folder.
+          machine.wait_for_text("Extension")
+          machine.screenshot("file_roller_compress")
+          machine.send_key("ret")
+          machine.wait_until_succeeds(f"tar -tzf {home}/archives/folder.tar.gz | grep -q folder/a.txt")
+          machine.execute("pkill -f io.elementary.files")
+
+      with subtest("Lock the screen"):
+          # Gala's SessionLocker doesn't have an in-session unlock UI yet
+          # (see the comment on LockScreenManager.manually_locked upstream)
+          # -- it just shows a black shield actor and, on user activity,
+          # switches back to a fresh LightDM greeter session to unlock. So
+          # we can only assert on the locked state itself here, via the
+          # org.gnome.ScreenSaver D-Bus interface gala also exposes.
+          env = "DBUS_SESSION_BUS_ADDRESS=unix:path=/run/user/${toString user.uid}/bus"
+          lock_cmd = "dbus-send --session --dest=org.gnome.ScreenSaver --print-reply /org/gnome/ScreenSaver org.gnome.ScreenSaver.Lock"
+          get_active_cmd = "dbus-send --session --dest=org.gnome.ScreenSaver --print-reply /org/gnome/ScreenSaver org.gnome.ScreenSaver.GetActive"
+          machine.succeed(f"su - ${user.name} -c '{env} {lock_cmd}'")
+          machine.wait_until_succeeds(f"su - ${user.name} -c '{env} {get_active_cmd}' | grep -q 'boolean true'")
+          machine.sleep(2)
+          machine.screenshot("locked")
+
+      with subtest("Unlock the screen"):
+          machine.send_chars(" ")
+          machine.sleep(15)
+          machine.succeed("ydotool mousemove -a 309 286")
+          machine.succeed("ydotool click 0xC0")
+          machine.sleep(2)
+          machine.send_chars("${user.password}\n")
+          machine.sleep(datetime.timedelta(milliseconds=250))
+          machine.screenshot("unlocking")
+
       with subtest("Check if gala has ever coredumped"):
           machine.fail("coredumpctl --json=short | grep gala")
           # So we can see the dock.
           machine.execute("pkill -f -9 io.elementary.videos")
           machine.sleep(10)
-          machine.screenshot("screen")
+          machine.screenshot("desktop")
     '';
 }

@@ -1,0 +1,223 @@
+--- a/src/Resources/Storage/Disk.vala
++++ b/src/Resources/Storage/Disk.vala
+@@ -8,6 +8,8 @@
+     public string model;
+     public uint64 size;
+     public uint64 free;
++    public uint64 used;
++    public bool mounted;
+     public string revision;
+     public string id;
+     public string device;
+@@ -22,11 +24,15 @@
+         revision = drive.revision;
+         id = drive.id;
+         free = 0;
++        used = 0;
++        mounted = false;
+     }
+ 
+     public void add_volume (Volume vol) {
+         volumes.add (vol);
+         free = free + vol.free;
++        used = used + vol.used;
++        mounted = mounted || vol.mount_point != null;
+     }
+ 
+     public Gee.ArrayList<Volume?> get_volumes () {
+--- a/src/Resources/Storage/StorageParser.vala
++++ b/src/Resources/Storage/StorageParser.vala
+@@ -26,4 +26,15 @@
+         return slaves_names;
+     }
+ 
++    // returns the name of the whole disk a partition belongs to,
++    // or the given name if it is not a partition
++    public string get_parent_name (string block_name) {
++        var path = Posix.realpath (Path.build_filename ("/sys/class/block", block_name));
++        if (path != null && FileUtils.test (Path.build_filename (path, "partition"), FileTest.EXISTS)) {
++            return Path.get_basename (Path.get_dirname (path));
++        }
++
++        return block_name;
++    }
++
+ }
+--- a/src/Resources/Storage/Storage.vala
++++ b/src/Resources/Storage/Storage.vala
+@@ -64,6 +64,8 @@
+ 
+                             var current_drive = new Disk (drive_dev);
+                             current_drive.device = block_device.device;
++                            // UDisks reports a drive size of 0 for some NVMe drives
++                            current_drive.size = block_device.size;
+ 
+                             current_drive.partition = p_type_display != null ? p_type_display : "Unknown";
+ 
+@@ -106,10 +108,20 @@
+ 
+                     var block_fs = udisks_obj.get_filesystem ();
+                     if (block_fs != null && block_fs.mount_points[0] != null) {
++                        // use a mount point that really belongs to this device,
++                        // e.g. "/" may be shadowed by another filesystem
+                         current_volume.mount_point = block_fs.mount_points[0];
++                        foreach (var mount_point in block_fs.mount_points) {
++                            Posix.Stat st;
++                            if (Posix.stat (mount_point, out st) == 0 && (uint64) st.st_dev == block_device.device_number) {
++                                current_volume.mount_point = mount_point;
++                                break;
++                            }
++                        }
+                         Posix.statvfs buf;
+-                        Posix.statvfs_exec (block_fs.mount_points[0], out buf);
+-                        current_volume.free = (uint64) buf.f_bfree * (uint64) buf.f_bsize;
++                        Posix.statvfs_exec (current_volume.mount_point, out buf);
++                        current_volume.free = (uint64) buf.f_bfree * (uint64) buf.f_frsize;
++                        current_volume.used = ((uint64) buf.f_blocks - (uint64) buf.f_bfree) * (uint64) buf.f_frsize;
+ 
+                     // } else {
+                     //     current_volume.mount_point = "";
+@@ -118,39 +130,37 @@
+ 
+ 
+ 
+-                    foreach (var disk in disks) {
+-                        if (current_volume.device.contains (disk.key)) {
+-                            disk.value.add_volume (current_volume);
+-                            debug ("Adding volume %s to %s", current_volume.device, disk.key);
+-                            //  debug ("  - block device: " + block_device.device);
+-                            //  debug ("  - drive: " + block_device.drive);
+-                            //  debug ("  - uuid: " + block_device.id_uuid);
+-                            //  debug ("  - crypto_backing_device: " + block_device.crypto_backing_device);
+-                            //  debug ("  - id: " + block_device.id);
+-                            //  debug ("  - id_usage: " + block_device.id_usage);
+-                            //  debug ("  - id_type: " + block_device.id_type);
+-                            //  debug ("  - id_label: " + block_device.id_label);
+-                            //  debug ("  - id_version: " + block_device.id_version);
+-                        } else if (current_volume.device.has_prefix ("/dev/dm")) {
+-                            debug ("Found logical volume: " + current_volume.device);
+-
+-                            // getting names of slave volumes on which this volume is based
+-                            var slaves_names = storage_parser.get_slaves_names (current_volume.device.split ("/")[2]);
++                    if (current_volume.device.has_prefix ("/dev/dm")) {
++                        debug ("Found logical volume: " + current_volume.device);
+ 
+-                            foreach (var slave_name in slaves_names) {
+-                                current_volume.add_slave (slave_name);
+-                            }
+-                            logical_volumes.set (current_volume.device, current_volume);
++                        // getting names of slave volumes on which this volume is based
++                        var dm_name = current_volume.device.split ("/")[2];
++                        foreach (var slave_name in storage_parser.get_slaves_names (dm_name)) {
++                            current_volume.add_slave (slave_name);
++                        }
++                        logical_volumes.set (current_volume.device, current_volume);
+ 
+-                            // if all slave volumes are coming from a single drive,
+-                            // then we can calculate free space on this drive
+-                            if (current_volume.strict_affiliation) {
+-                                string affiliated_disk_device = current_volume.slaves[0][0:-1];
+-
+-                                var affiliated_disk = disks.get ("/dev/" + affiliated_disk_device);
+-                                if (affiliated_disk != null) {
+-                                    affiliated_disk.free = affiliated_disk.free + current_volume.free;
+-                                }
++                        // if all slave volumes are coming from a single drive,
++                        // then we can calculate used space on this drive
++                        var affiliated_disk = find_disk_for_block (dm_name);
++                        if (affiliated_disk != null) {
++                            affiliated_disk.add_volume (current_volume);
++                            debug ("Adding logical volume %s to %s", current_volume.device, affiliated_disk.device);
++                        }
++                    } else {
++                        foreach (var disk in disks) {
++                            if (current_volume.device.contains (disk.key)) {
++                                disk.value.add_volume (current_volume);
++                                debug ("Adding volume %s to %s", current_volume.device, disk.key);
++                                //  debug ("  - block device: " + block_device.device);
++                                //  debug ("  - drive: " + block_device.drive);
++                                //  debug ("  - uuid: " + block_device.id_uuid);
++                                //  debug ("  - crypto_backing_device: " + block_device.crypto_backing_device);
++                                //  debug ("  - id: " + block_device.id);
++                                //  debug ("  - id_usage: " + block_device.id_usage);
++                                //  debug ("  - id_type: " + block_device.id_type);
++                                //  debug ("  - id_label: " + block_device.id_label);
++                                //  debug ("  - id_version: " + block_device.id_version);
+                             }
+                         }
+                     }
+@@ -161,6 +171,30 @@
+     }
+ 
+ 
++    // finds the drive a block device lives on, following device mapper
++    // slaves (e.g. LUKS, LVM); returns null if it spans multiple drives
++    private Disk? find_disk_for_block (string block_name) {
++        var parent = storage_parser.get_parent_name (block_name);
++        if (disks.has_key ("/dev/" + parent)) {
++            return disks["/dev/" + parent];
++        }
++
++        if (!block_name.has_prefix ("dm-")) {
++            return null;
++        }
++
++        Disk? found = null;
++        foreach (var slave_name in storage_parser.get_slaves_names (block_name)) {
++            var disk = find_disk_for_block (slave_name);
++            if (disk == null || (found != null && found != disk)) {
++                return null;
++            }
++            found = disk;
++        }
++
++        return found;
++    }
++
+     public Disk? get_drive (string did) {
+         if (disks.has_key (did)) {
+             return disks[did];
+--- a/src/Resources/Storage/Volume.vala
++++ b/src/Resources/Storage/Volume.vala
+@@ -11,6 +11,7 @@
+     public string mount_point;
+     public uint64 size;
+     public uint64 free;
++    public uint64 used;
+     public uint64 offset;
+ 
+     // means the volume is only on one physical disk
+--- a/src/Views/SystemView/SystemStorageView.vala
++++ b/src/Views/SystemView/SystemStorageView.vala
+@@ -97,11 +97,11 @@
+             };
+ 
+             string size_string = format_size ((uint64) drive.size, IEC_UNITS);
+-            string used_string = format_size ((uint64) (drive.size - drive.free), IEC_UNITS);
++            string used_string = format_size (drive.used, IEC_UNITS);
+ 
+             string drive_block_name_and_size_string = "%s 𐄁 %s / %s".printf (drive.device, used_string, size_string);
+ 
+-            if (drive.free == 0) {
++            if (!drive.mounted) {
+                 drive_block_name_and_size_string = "%s 𐄁 %s".printf (drive.device, size_string);
+             }
+ 
+@@ -122,7 +122,7 @@
+                 margin_bottom = 6
+             };
+             usagebar.add_css_class (Granite.STYLE_CLASS_FLAT);
+-            usagebar.set_value (100.0 * (drive.size - drive.free) / drive.size);
++            usagebar.set_value (100.0 * drive.used / drive.size);
+ 
+             var drive_box = new Gtk.Box (VERTICAL, 0) {
+                 margin_top = 6,
+@@ -132,7 +132,7 @@
+             };
+             drive_box.append (drive_name_label);
+             drive_box.append (drive_block_name_and_size_label);
+-            if (drive.free == 0) {
++            if (!drive.mounted) {
+                 drive_box.append (drive_not_mounted_label);
+             } else {
+                 drive_box.append (usagebar);

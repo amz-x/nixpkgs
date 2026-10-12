@@ -17,15 +17,15 @@
   wrapGAppsHook4,
 }:
 
-stdenv.mkDerivation rec {
+stdenv.mkDerivation {
   pname = "elementary-terminal";
-  version = "8.1.0";
+  version = "8.1.0-unstable-2026-09-03"; # nixpkgs-update: no auto update
 
   src = fetchFromGitHub {
     owner = "elementary";
     repo = "terminal";
-    tag = version;
-    hash = "sha256-npPuanin2WKuIAVbvGwBf5fGHYp7LKGac+s+28apaLU=";
+    rev = "b383d45fad21368394f25229557d4f2433530f57";
+    hash = "sha256-XQyw1Z6RDS50tCXgeltjdOOT0jPJtdGBQ4cDx9oQu7I=";
   };
 
   nativeBuildInputs = [

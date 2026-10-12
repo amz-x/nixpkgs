@@ -9,15 +9,15 @@
   python3,
 }:
 
-stdenv.mkDerivation rec {
+stdenv.mkDerivation {
   pname = "elementary-wallpapers";
-  version = "8.0.0";
+  version = "8.0.0-unstable-2026-06-29"; # nixpkgs-update: no auto update
 
   src = fetchFromGitHub {
     owner = "elementary";
     repo = "wallpapers";
-    rev = version;
-    sha256 = "sha256-qbqYr+3Vqwi1UBD0fRW6lI2rj5Iy51taZRGxDTpKfpg=";
+    rev = "f28b86144ba01d788ac61ad198ca16fa9477913f";
+    sha256 = "sha256-wFcjyZ/caGM94QtB7Decy73u1rbYLMt73GUuJwMNvlg=";
   };
 
   nativeBuildInputs = [

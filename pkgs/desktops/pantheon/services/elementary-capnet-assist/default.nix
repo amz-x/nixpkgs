@@ -16,15 +16,15 @@
   wrapGAppsHook4,
 }:
 
-stdenv.mkDerivation rec {
+stdenv.mkDerivation {
   pname = "elementary-capnet-assist";
-  version = "8.0.2";
+  version = "8.0.2-unstable-2026-10-03";
 
   src = fetchFromGitHub {
     owner = "elementary";
     repo = "capnet-assist";
-    rev = version;
-    sha256 = "sha256-HowrCYOVSYSOCRpTIXFfw4lLUulXY6j5QcxJOBMo984=";
+    rev = "7442c62e5ae410e32be4146a50cbf39389533245";
+    hash = "sha256-RgPVdO2SIzJtPxt6mnfzbZRBoKpdq3ukbdlolcIXPN0=";
   };
 
   nativeBuildInputs = [

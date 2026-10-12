@@ -24,15 +24,15 @@
   nix-update-script,
 }:
 
-stdenv.mkDerivation rec {
+stdenv.mkDerivation {
   pname = "appcenter";
-  version = "8.4.0";
+  version = "8.4.0-unstable-2026-10-09"; # nixpkgs-update: no auto update
 
   src = fetchFromGitHub {
     owner = "elementary";
     repo = "appcenter";
-    tag = version;
-    hash = "sha256-8OgGeht0K7MpV9o2MOOt/XvTWHvvQGH+4bLzsWCsFqg=";
+    rev = "03bf439b4ed2bad58f2e0ca8fbd1a3503b9e64c4";
+    hash = "sha256-K4kFsa3JWA/XqbXFpo4pmOCZyFWdZOZ2OR5jm66l2vE=";
   };
 
   nativeBuildInputs = [

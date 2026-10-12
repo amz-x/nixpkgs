@@ -19,15 +19,15 @@
   switchboard,
 }:
 
-stdenv.mkDerivation rec {
+stdenv.mkDerivation {
   pname = "switchboard-plug-network";
-  version = "8.2.0";
+  version = "8.2.0-unstable-2026-09-22";
 
   src = fetchFromGitHub {
     owner = "elementary";
     repo = "switchboard-plug-network";
-    rev = version;
-    hash = "sha256-H43mRPEujs6A4Bk2uC3mP91Hp5I8gojaagoXUT/5eW8=";
+    rev = "9bc171b06a17d5af83e6339b2a79a2ad42485d3a";
+    hash = "sha256-unGQ6HGTCz/dxc6ygRe2+9Vy+R2tIFnnJz++x0AwVGE=";
   };
 
   patches = [

@@ -2,6 +2,7 @@
   lib,
   stdenv,
   fetchFromGitHub,
+  fetchpatch,
   python3,
   meson,
   ninja,
@@ -31,6 +32,19 @@ stdenv.mkDerivation rec {
     rev = version;
     sha256 = "sha256-WM0Wo9giVP5pkMFaPCHsMfnAP6xD71zg6QLCYV6lmkY=";
   };
+
+  patches = [
+    # contractor renamed its D-Bus name from org.elementary.Contractor to
+    # io.elementary.Contractor (elementary/contractor#41), so without this
+    # ContractorProxy finds no service and apps get no contracts, e.g. no
+    # "Compress"/"Extract Here" in Files' context menu.
+    # https://github.com/elementary/granite/pull/1051
+    (fetchpatch {
+      name = "rename-contractor-rdnn.patch";
+      url = "https://github.com/elementary/granite/commit/578369486e204065a714b92fd0c09892223cf2f8.patch";
+      hash = "sha256-W+Px6TnOQUReTnD5If2v/KbJMKXD3HnOvXJbKOuHTiw=";
+    })
+  ];
 
   nativeBuildInputs = [
     gettext

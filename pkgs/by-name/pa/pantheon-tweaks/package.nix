@@ -9,6 +9,7 @@
   sassc,
   vala,
   wrapGAppsHook4,
+  appstream,
   gnome-settings-daemon,
   gtk4,
   pango,
@@ -17,13 +18,13 @@
 
 stdenv.mkDerivation (finalAttrs: {
   pname = "pantheon-tweaks";
-  version = "2.5.2";
+  version = "2.6.0";
 
   src = fetchFromGitHub {
     owner = "pantheon-tweaks";
     repo = "pantheon-tweaks";
     rev = finalAttrs.version;
-    hash = "sha256-C6QgGjNjkgJ1qCNNe5gkwjzMfBosxjDIdVyIokCRkbE=";
+    hash = "sha256-mEeU+8nBzfH2nCtGKq5zNMDiCBU2a+4yyBB5itYx/8I=";
   };
 
   nativeBuildInputs = [
@@ -36,6 +37,7 @@ stdenv.mkDerivation (finalAttrs: {
   ];
 
   buildInputs = [
+    appstream
     gnome-settings-daemon # org.gnome.settings-daemon.plugins.xsettings
     gtk4
     pango

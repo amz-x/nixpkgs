@@ -23,15 +23,16 @@
   switchboard,
 }:
 
-stdenv.mkDerivation rec {
+stdenv.mkDerivation {
   pname = "switchboard-plug-keyboard";
-  version = "8.1.1";
+  version = "8.1.1-unstable-2026-08-09";
 
+  # nixpkgs-update: no auto update
   src = fetchFromGitHub {
     owner = "elementary";
     repo = "settings-keyboard";
-    rev = version;
-    sha256 = "sha256-JuFx0PkbB6ctXhqtORlgtSq9oigaLL2N4IKX7NQgHcU=";
+    rev = "ebe4b19d86cbf20ff40534f8e3fcedb0be4a1509";
+    sha256 = "sha256-SL5YAIROkxpTbmi7Q4vWlGm/w4f7MZboW03uMs2YQDw=";
   };
 
   patches = [

@@ -18,15 +18,15 @@
   wrapGAppsHook4,
 }:
 
-stdenv.mkDerivation rec {
+stdenv.mkDerivation {
   pname = "pantheon-agent-polkit";
-  version = "8.1.0";
+  version = "8.1.0-unstable-2026-10-05"; # nixpkgs-update: no auto update
 
   src = fetchFromGitHub {
     owner = "elementary";
     repo = "pantheon-agent-polkit";
-    rev = version;
-    hash = "sha256-ge/RZhzujI++ye7Gka/28W9CQjbmy+/5NstjqcVDUXw=";
+    rev = "0417c127ab98a0ae4a12e0b9dd7649edecc14da7";
+    hash = "sha256-hkip+SAG3cU+WF4MiKu/Im77d1fVDlRkH2InssxDhmc=";
   };
 
   nativeBuildInputs = [

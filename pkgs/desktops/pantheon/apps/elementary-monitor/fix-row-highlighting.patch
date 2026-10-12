@@ -1,0 +1,33 @@
+--- a/data/stylesheet/_index.scss
++++ b/data/stylesheet/_index.scss
+@@ -173,7 +173,15 @@
+         padding: 0.5em;
+     }
+ 
+-    row:nth-child(odd) {
++    row:nth-child(odd):not(:selected):not(:focus-visible) {
+         background: #{'@bg_color'};
+     }
++
++    // highlight selected rows with the accent color, like the theme does
++    // for keyboard navigation, so mouse and keyboard selection look the same
++    listview row:selected,
++    listview row:focus-visible:selected {
++        background: #{'@selected_bg_color'};
++        color: #{'@selected_fg_color'};
++    }
+ }
+--- a/src/Views/LogView/LogView.vala
++++ b/src/Views/LogView/LogView.vala
+@@ -18,7 +18,10 @@
+ 
+         model = new SystemdLogModel ();
+ 
+-        var selection_model = new Gtk.NoSelection (model);
++        var selection_model = new Gtk.SingleSelection (model) {
++            autoselect = false,
++            can_unselect = true
++        };
+ 
+         var header_factory = new Gtk.SignalListItemFactory ();
+         header_factory.setup.connect (setup_header);

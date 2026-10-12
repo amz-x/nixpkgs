@@ -19,15 +19,15 @@
   tzdata,
 }:
 
-stdenv.mkDerivation rec {
+stdenv.mkDerivation {
   pname = "switchboard-plug-datetime";
-  version = "8.1.0";
+  version = "8.1.0-unstable-2026-09-22";
 
   src = fetchFromGitHub {
     owner = "elementary";
     repo = "switchboard-plug-datetime";
-    rev = version;
-    sha256 = "sha256-VOL0F0obuXVz0G5hMI/hpUf2T3H8XUw64wu4MxRi57g=";
+    rev = "70ec8660b3c94c12963191071cae6e15405ac936";
+    hash = "sha256-IrV0TyJu3oqiWcjToM1/rVOC/UAbh1r4614TmgUPAxc=";
   };
 
   patches = [

@@ -15,15 +15,15 @@
   wrapGAppsHook3,
 }:
 
-stdenv.mkDerivation rec {
+stdenv.mkDerivation {
   pname = "contractor";
-  version = "0.3.5";
+  version = "0.3.5-unstable-2026-08-25"; # nixpkgs-update: no auto update
 
   src = fetchFromGitHub {
     owner = "elementary";
     repo = "contractor";
-    rev = version;
-    sha256 = "1sqww7zlzl086pjww3d21ah1g78lfrc9aagrqhmsnnbji9gwb8ab";
+    rev = "78d82ee992fc6a618fbdbad3080369e8e0c68d79";
+    sha256 = "sha256-7za0rWLAuWvf2//MoYOOQAaJETBI1cLpZ4tWAvEsiwg=";
   };
 
   nativeBuildInputs = [

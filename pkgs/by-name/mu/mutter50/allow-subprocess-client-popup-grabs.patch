@@ -1,0 +1,64 @@
+From: Christopher Crouse <mail@amz-x.com>
+Subject: wayland/xdg-shell: Let compositor-spawned clients grab popups
+
+A grabbing xdg_popup is only shown if its grab serial matches the seat's
+latest pointer button press or key press. A shell panel launched by the
+compositor (Pantheon's wingpanel, started by gala via MetaWaylandClient)
+opens its applications menu popover when the compositor handles a
+keybinding such as Alt+F2. The panel never received that key event, so
+the serial it presents is stale and mutter immediately sends popup_done:
+the menu never appears, except right after the panel itself was clicked.
+
+Skip the serial check for clients of kind
+META_WAYLAND_CLIENT_KIND_SUBPROCESS, which the compositor spawned itself
+and therefore trusts. All other clients keep the existing behaviour.
+
+diff --git a/src/wayland/meta-wayland-xdg-shell.c b/src/wayland/meta-wayland-xdg-shell.c
+index 026ae2a..8e3abe5 100644
+--- a/src/wayland/meta-wayland-xdg-shell.c
++++ b/src/wayland/meta-wayland-xdg-shell.c
+@@ -29,6 +29,7 @@
+ #include "core/meta-window-config-private.h"
+ #include "core/window-private.h"
+ #include "meta/meta-window-config.h"
++#include "wayland/meta-wayland-client-private.h"
+ #include "wayland/meta-wayland-outputs.h"
+ #include "wayland/meta-wayland-popup.h"
+ #include "wayland/meta-wayland-private.h"
+@@ -1286,6 +1287,26 @@ meta_wayland_xdg_popup_place (MetaWaylandXdgPopup *xdg_popup,
+   meta_window_place_with_placement_rule (window, &scaled_placement_rule);
+ }
+ 
++/*
++ * Clients spawned by the compositor itself (e.g. a desktop shell's panel)
++ * may open grabbing popups in response to compositor keybindings. In that
++ * case the client never received the input event that triggered the popup,
++ * so it cannot present a serial that passes meta_wayland_seat_can_popup().
++ */
++static gboolean
++is_trusted_subprocess_client (MetaWaylandSurface *surface)
++{
++  MetaWaylandClient *client;
++
++  if (!surface->resource)
++    return FALSE;
++
++  client = meta_get_wayland_client (wl_resource_get_client (surface->resource));
++
++  return client &&
++         meta_wayland_client_get_kind (client) == META_WAYLAND_CLIENT_KIND_SUBPROCESS;
++}
++
+ static void
+ finish_popup_setup (MetaWaylandXdgPopup *xdg_popup)
+ {
+@@ -1328,7 +1349,8 @@ finish_popup_setup (MetaWaylandXdgPopup *xdg_popup)
+     {
+       MetaWaylandSurface *top_popup = NULL;
+ 
+-      if (!meta_wayland_seat_can_popup (seat, serial))
++      if (!meta_wayland_seat_can_popup (seat, serial) &&
++          !is_trusted_subprocess_client (surface))
+         {
+           xdg_popup_send_popup_done (xdg_popup->resource);
+           return;

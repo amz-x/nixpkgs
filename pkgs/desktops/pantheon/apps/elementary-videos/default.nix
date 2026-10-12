@@ -16,15 +16,15 @@
   libgee,
 }:
 
-stdenv.mkDerivation rec {
+stdenv.mkDerivation {
   pname = "elementary-videos";
-  version = "8.0.2";
+  version = "8.0.2-unstable-2026-10-11"; # nixpkgs-update: no auto update
 
   src = fetchFromGitHub {
     owner = "elementary";
     repo = "videos";
-    rev = version;
-    hash = "sha256-lvIsLjsb4HqwXDsH2krBlxmy7kJdadpjDcw+svaWV+Q=";
+    rev = "f7956200171c053a6d811f326a2561bc99a74a19";
+    hash = "sha256-cjp8IroePkFc+MsgGsuigmEilFmmUiOFMtpt/PBmN6M=";
   };
 
   nativeBuildInputs = [

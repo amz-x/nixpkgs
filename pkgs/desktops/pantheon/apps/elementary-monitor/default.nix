@@ -22,6 +22,7 @@
   linuxPackages,
   live-chart,
   pciutils,
+  systemd,
   udisks,
   wingpanel,
   nix-update-script,
@@ -29,14 +30,28 @@
 
 stdenv.mkDerivation (finalAttrs: {
   pname = "elementary-monitor";
-  version = "8.0.1";
+  version = "8.0.1-unstable-2026-09-25"; # nixpkgs-update: no auto update
 
   src = fetchFromGitHub {
     owner = "elementary";
     repo = "monitor";
-    tag = finalAttrs.version;
-    hash = "sha256-VlyIK7UJEHw7vvc9WEHooPSPl8OQ5ZcBrjtYrI3Qx/w=";
+    rev = "789e453719e4e7e43297887394c2808a661a4c6a";
+    hash = "sha256-Nz12wbRa9b4DoGkVpMqp6Zy04kAKD1AMU8kz0uQfITI=";
   };
+
+  patches = [
+    # Support AMD Zenpower kernel module for CPU temperatures.
+    ./fix-amd-cpu-temperature.patch
+    # Journal entries without PRIORITY crashed the log view
+    ./fix-log-missing-priority-crash.patch
+    # Odd-row striping hides selected/focused rows, mouse selection is gray
+    # instead of the accent color, and log rows could not be selected
+    ./fix-row-highlighting.patch
+    # Count used space of LUKS/LVM volumes on their NVMe drive
+    ./fix-storage-usage.patch
+    # Load 2000 log entries at a time instead of 200
+    ./increase-log-chunk-size.patch
+  ];
 
   strictDeps = true;
 
@@ -64,6 +79,7 @@ stdenv.mkDerivation (finalAttrs: {
     linuxPackages.nvidia_x11.settings.libXNVCtrl
     live-chart
     pciutils
+    systemd
     udisks
     wingpanel
   ];
