@@ -24,15 +24,15 @@
   ctags,
 }:
 
-stdenv.mkDerivation rec {
+stdenv.mkDerivation {
   pname = "elementary-code";
-  version = "8.4.0";
+  version = "8.4.0-unstable-2026-10-06"; # nixpkgs-update: no auto update
 
   src = fetchFromGitHub {
     owner = "elementary";
     repo = "code";
-    tag = version;
-    hash = "sha256-2ZxYzSBncQMEpYdM75bicMBG5XLtVNLmUu811T4OZS4=";
+    rev = "07ba77be46b91318190a0cbd2331aef932c5e16a";
+    hash = "sha256-9X8jLnA/b782qrupluufeeIk6FdCnULzDqfVKAPSUD0=";
   };
 
   strictDeps = true;

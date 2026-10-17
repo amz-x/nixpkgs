@@ -26,6 +26,7 @@ lib.makeScope pkgs.newScope (
       switchboard-plug-security-privacy
       switchboard-plug-sharing
       switchboard-plug-sound
+      switchboard-plug-useraccounts
       switchboard-plug-wacom
     ];
 
@@ -45,10 +46,10 @@ lib.makeScope pkgs.newScope (
 
     teams = [ lib.teams.pantheon ];
 
-    mutter = pkgs.mutter48;
+    mutter = pkgs.mutter50;
 
-    # Using 48 to match Mutter used in Pantheon
-    gnome-settings-daemon = pkgs.gnome-settings-daemon48;
+    # Using 50 to match Mutter used in Pantheon
+    gnome-settings-daemon = pkgs.gnome-settings-daemon50;
 
     elementary-gsettings-schemas = callPackage ./desktop/elementary-gsettings-schemas { };
 
@@ -65,6 +66,8 @@ lib.makeScope pkgs.newScope (
     elementary-camera = callPackage ./apps/elementary-camera { };
 
     elementary-code = callPackage ./apps/elementary-code { };
+
+    elementary-contacts = callPackage ./apps/elementary-contacts { };
 
     elementary-dock = callPackage ./apps/elementary-dock { };
 
@@ -126,6 +129,8 @@ lib.makeScope pkgs.newScope (
 
     granite7 = callPackage ./libraries/granite/7 { };
 
+    granite9 = callPackage ./libraries/granite/9 { };
+
     live-chart = callPackage ./libraries/live-chart { };
 
     pantheon-wayland = callPackage ./libraries/pantheon-wayland { };
@@ -151,8 +156,6 @@ lib.makeScope pkgs.newScope (
     #### WINGPANEL INDICATORS
 
     wingpanel-applications-menu = callPackage ./desktop/wingpanel-indicators/applications-menu { };
-
-    wingpanel-indicator-a11y = callPackage ./desktop/wingpanel-indicators/a11y { };
 
     wingpanel-indicator-bluetooth = callPackage ./desktop/wingpanel-indicators/bluetooth { };
 
@@ -214,6 +217,8 @@ lib.makeScope pkgs.newScope (
 
     switchboard-plug-sound = callPackage ./apps/switchboard-plugs/sound { };
 
+    switchboard-plug-useraccounts = callPackage ./apps/switchboard-plugs/useraccounts { };
+
     switchboard-plug-wacom = callPackage ./apps/switchboard-plugs/wacom { };
 
     ### ARTWORK
@@ -260,5 +265,7 @@ lib.makeScope pkgs.newScope (
   switchboard-plug-a11y = throw "pantheon.switchboard-plug-a11y has been removed, abandoned by upstream."; # added 2024-08-23
 
   wingpanel-indicator-session = throw "pantheon.wingpanel-indicator-session has been removed, abandoned by upstream."; # added 2024-08-23
+
+  wingpanel-indicator-a11y = throw "pantheon.wingpanel-indicator-a11y has been removed, abandoned by upstream."; # added 2026-09-13
 
 }

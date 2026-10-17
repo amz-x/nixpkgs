@@ -1,0 +1,50 @@
+From 6e29b5b39b62e92851325330acc474a4fff82036 Mon Sep 17 00:00:00 2001
+From: Christopher Crouse <mail@amz-x.com>
+Date: Fri, 16 Oct 2026 19:51:49 +0200
+Subject: [PATCH] Fix: Pass a display launch context when launching apps
+
+---
+ libcore/File.vala          | 2 +-
+ src/Utils/MimeActions.vala | 7 +++++--
+ 2 files changed, 6 insertions(+), 3 deletions(-)
+
+diff --git a/libcore/File.vala b/libcore/File.vala
+index 141c477d5c..0c50fe1411 100644
+--- a/libcore/File.vala
++++ b/libcore/File.vala
+@@ -996,7 +996,7 @@ public class Files.File : GLib.Object {
+         }
+ 
+         try {
+-            app_info.launch (files, null);
++            app_info.launch (files, Gdk.Display.get_default ().get_app_launch_context ());
+         } catch (GLib.Error e) {
+             GLib.Error prefixed_error;
+             GLib.Error.propagate_prefixed (out prefixed_error, e, _("Unable to Launch Desktop File: "));
+diff --git a/src/Utils/MimeActions.vala b/src/Utils/MimeActions.vala
+index ef4d0c8908..13360bad94 100644
+--- a/src/Utils/MimeActions.vala
++++ b/src/Utils/MimeActions.vala
+@@ -304,9 +304,12 @@ public class Files.MimeActions {
+      }
+ 
+     private static void launch_with_app (GLib.List<GLib.File> files_to_open, AppInfo app, Gtk.Window? win) {
++        // A display launch context hands the app an activation token so it may take focus
++        var display = win != null ? win.get_display () : Gdk.Display.get_default ();
++        var context = display.get_app_launch_context ();
+         if (app.supports_files ()) {
+             try {
+-                app.launch (files_to_open, null);
++                app.launch (files_to_open, context);
+             } catch (GLib.Error e) {
+                 PF.Dialogs.show_error_dialog (_("Failed to open files"), e.message, win);
+             }
+@@ -316,7 +319,7 @@ public class Files.MimeActions {
+                 uris.append (file.get_uri ());
+             }
+             try {
+-                app.launch_uris (uris, null);
++                app.launch_uris (uris, context);
+             } catch (GLib.Error e) {
+                 PF.Dialogs.show_error_dialog (_("Could not open URIs"), e.message, win);
+             }

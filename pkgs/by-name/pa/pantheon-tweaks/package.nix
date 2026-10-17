@@ -9,6 +9,7 @@
   sassc,
   vala,
   wrapGAppsHook4,
+  appstream,
   gnome-settings-daemon,
   gtk4,
   pango,
@@ -36,6 +37,7 @@ stdenv.mkDerivation (finalAttrs: {
   ];
 
   buildInputs = [
+    appstream
     gnome-settings-daemon # org.gnome.settings-daemon.plugins.xsettings
     gtk4
     pango

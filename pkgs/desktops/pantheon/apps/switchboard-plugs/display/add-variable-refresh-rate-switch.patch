@@ -1,0 +1,284 @@
+diff --git a/src/Objects/Monitor.vala b/src/Objects/Monitor.vala
+index a27f8c4..009db57 100644
+--- a/src/Objects/Monitor.vala
++++ b/src/Objects/Monitor.vala
+@@ -32,6 +32,19 @@ public class Display.Monitor : GLib.Object {
+ 
+     public string display_name { get; set; }
+     public bool is_builtin { get; set; }
++    public int min_refresh_rate { get; set; default = 0; }
++
++    public bool supports_variable_refresh_rate {
++        get {
++            foreach (var mode in modes) {
++                if (mode.is_variable_refresh_rate) {
++                    return true;
++                }
++            }
++
++            return false;
++        }
++    }
+     public Gee.LinkedList<Display.MonitorMode> modes { get; construct; }
+ 
+     public Display.MonitorMode current_mode {
+diff --git a/src/Objects/MonitorManager.vala b/src/Objects/MonitorManager.vala
+index 9e97c1c..059399e 100644
+--- a/src/Objects/MonitorManager.vala
++++ b/src/Objects/MonitorManager.vala
+@@ -171,6 +171,16 @@ public class Display.MonitorManager : GLib.Object {
+                 monitor.is_builtin = false;
+             }
+ 
++            var min_refresh_rate_variant = mutter_monitor.properties.lookup ("min-refresh-rate");
++            if (min_refresh_rate_variant != null) {
++                monitor.min_refresh_rate = min_refresh_rate_variant.get_int32 ();
++            } else {
++                /*
++                 * Absence of "min-refresh-rate" means unknown according to the documentation.
++                 */
++                monitor.min_refresh_rate = 0;
++            }
++
+             foreach (var mutter_mode in mutter_monitor.modes) {
+                 var mode = monitor.get_mode_by_id (mutter_mode.id);
+                 if (mode == null) {
+@@ -197,6 +207,13 @@ public class Display.MonitorManager : GLib.Object {
+                 } else {
+                     mode.is_current = false;
+                 }
++
++                /*
++                 * Absence of "refresh-rate-mode" means "fixed" according to the documentation.
++                 */
++                var refresh_rate_mode_variant = mutter_mode.properties.lookup ("refresh-rate-mode");
++                mode.is_variable_refresh_rate = refresh_rate_mode_variant != null &&
++                                                refresh_rate_mode_variant.get_string () == "variable";
+             }
+         }
+ 
+diff --git a/src/Objects/MonitorMode.vala b/src/Objects/MonitorMode.vala
+index 1cb19b9..81d843c 100644
+--- a/src/Objects/MonitorMode.vala
++++ b/src/Objects/MonitorMode.vala
+@@ -39,6 +39,7 @@ public class Display.MonitorMode : GLib.Object {
+     public double preferred_scale { get; set; }
+     public bool is_preferred { get; set; }
+     public bool is_current { get; set; }
++    public bool is_variable_refresh_rate { get; set; default = false; }
+ 
+     public double[] supported_scales;
+ 
+diff --git a/src/Objects/VirtualMonitor.vala b/src/Objects/VirtualMonitor.vala
+index efd7bbf..ee89164 100644
+--- a/src/Objects/VirtualMonitor.vala
++++ b/src/Objects/VirtualMonitor.vala
+@@ -187,14 +187,64 @@ public class Display.VirtualMonitor : GLib.Object {
+         available_scales_store.splice (0, available_scales_store.get_n_items (), scales);
+     }
+ 
++    public bool supports_variable_refresh_rate {
++        get {
++            return !is_mirror && monitor.supports_variable_refresh_rate;
++        }
++    }
++
++    public bool variable_refresh_rate {
++        get {
++            return supports_variable_refresh_rate && monitor.current_mode.is_variable_refresh_rate;
++        }
++    }
++
+     public Display.MonitorMode? get_mode_for_resolution (int width, int height) {
++        // Keep the current Variable Refresh Rate state when switching resolution if possible
++        var vrr = variable_refresh_rate;
++        Display.MonitorMode? fallback = null;
+         foreach (var mode in get_available_modes ()) {
+             if (mode.width == width && mode.height == height) {
+-                return mode;
++                if (mode.is_variable_refresh_rate == vrr) {
++                    return mode;
++                }
++
++                if (fallback == null) {
++                    fallback = mode;
++                }
++            }
++        }
++
++        return fallback;
++    }
++
++    /**
++     * Switches between the fixed and the variable refresh rate variant of the
++     * current mode, keeping the resolution and the closest refresh rate.
++     */
++    public void set_variable_refresh_rate (bool enabled) {
++        if (!supports_variable_refresh_rate || variable_refresh_rate == enabled) {
++            return;
++        }
++
++        var current_mode = monitor.current_mode;
++        Display.MonitorMode? new_mode = null;
++        foreach (var mode in monitor.modes) {
++            if (mode.is_variable_refresh_rate != enabled ||
++                mode.width != current_mode.width ||
++                mode.height != current_mode.height) {
++                continue;
++            }
++
++            if (new_mode == null ||
++                (mode.frequency - current_mode.frequency).abs () < (new_mode.frequency - current_mode.frequency).abs ()) {
++                new_mode = mode;
+             }
+         }
+ 
+-        return null;
++        if (new_mode != null) {
++            set_current_mode (new_mode);
++        }
+     }
+ 
+     public void set_current_mode (Display.MonitorMode current_mode) {
+@@ -207,7 +257,8 @@ public class Display.VirtualMonitor : GLib.Object {
+                         continue;
+                     }
+ 
+-                    if (mode.width == current_mode.width && mode.height == current_mode.height) {
++                    if (mode.width == current_mode.width && mode.height == current_mode.height &&
++                        !mode.is_variable_refresh_rate) {
+                         mode_found = true;
+                         mode.is_current = true;
+                     } else {
+diff --git a/src/Utils.vala b/src/Utils.vala
+index 5498935..f6b65dd 100644
+--- a/src/Utils.vala
++++ b/src/Utils.vala
+@@ -27,7 +27,8 @@ namespace Display.Utils {
+         foreach (var monitor in monitors) {
+             if (first_monitor) {
+                 foreach (var mode in monitor.modes) {
+-                    if (min_scale in mode.supported_scales) {
++                    // Variable Refresh Rate is per output, so it is not offered when mirroring
++                    if (min_scale in mode.supported_scales && !mode.is_variable_refresh_rate) {
+                         common_modes.add (mode);
+                     }
+                 }
+diff --git a/src/Widgets/DisplayWidget.vala b/src/Widgets/DisplayWidget.vala
+index fedb8d1..4094779 100644
+--- a/src/Widgets/DisplayWidget.vala
++++ b/src/Widgets/DisplayWidget.vala
+@@ -49,6 +49,8 @@ public class Display.DisplayWidget : Gtk.Box {
+     private Gtk.ComboBox refresh_combobox;
+     private Gtk.ListStore refresh_list_store;
+ 
++    private Granite.SwitchModelButton vrr_switch;
++
+     private Gtk.DropDown scale_drop_down;
+ 
+     private Gtk.Label display_label;
+@@ -140,6 +142,13 @@ public class Display.DisplayWidget : Gtk.Box {
+         refresh_combobox.pack_start (text_renderer, true);
+         refresh_combobox.add_attribute (text_renderer, "text", RefreshColumns.NAME);
+ 
++        vrr_switch = new Granite.SwitchModelButton (_("Variable Refresh Rate")) {
++            description = _("Reduces stutter and tearing in fullscreen games and videos"),
++            margin_top = 6
++        };
++
++        update_vrr_switch ();
++
+         // Build resolution menu
+         // First, get list of unique resolutions from available modes.
+         Resolution[] resolutions = {};
+@@ -243,6 +252,7 @@ public class Display.DisplayWidget : Gtk.Box {
+         popover_box.append (rotation_drop_down);
+         popover_box.append (refresh_label);
+         popover_box.append (refresh_combobox);
++        popover_box.append (vrr_switch);
+ 
+         if (!MonitorManager.get_default ().global_scale_required) {
+             popover_box.append (scale_label);
+@@ -288,6 +298,7 @@ public class Display.DisplayWidget : Gtk.Box {
+         use_switch.bind_property ("active", rotation_drop_down, "sensitive");
+         use_switch.bind_property ("active", refresh_combobox, "sensitive");
+         use_switch.bind_property ("active", scale_drop_down, "sensitive");
++        use_switch.bind_property ("active", vrr_switch, "sensitive", SYNC_CREATE);
+ 
+         use_switch.notify["active"].connect (() => {
+             if (resolution_combobox.active == -1) resolution_combobox.set_active (0);
+@@ -364,6 +375,20 @@ public class Display.DisplayWidget : Gtk.Box {
+             }
+         });
+ 
++        vrr_switch.notify["active"].connect (() => {
++            if (vrr_switch.active == virtual_monitor.variable_refresh_rate) {
++                return;
++            }
++
++            // Prevent breaking autohide by closing popover
++            popover.popdown ();
++
++            virtual_monitor.set_variable_refresh_rate (vrr_switch.active);
++            populate_refresh_rates ();
++            configuration_changed ();
++            check_position ();
++        });
++
+         scale_drop_down.notify["selected-item"].connect (() => {
+             // Prevent breaking autohide by closing popover
+             popover.popdown ();
+@@ -399,11 +424,17 @@ public class Display.DisplayWidget : Gtk.Box {
+ 
+             double[] frequencies = {};
+             bool refresh_set = false;
++            var vrr = virtual_monitor.variable_refresh_rate;
+             foreach (var mode in virtual_monitor.get_available_modes ()) {
+                 if (mode.width != active_width || mode.height != active_height) {
+                     continue;
+                 }
+ 
++                // Only offer the refresh rates matching the Variable Refresh Rate switch
++                if (mode.is_variable_refresh_rate != vrr) {
++                    continue;
++                }
++
+                 if (mode.frequency in frequencies) {
+                     continue;
+                 }
+@@ -422,7 +453,14 @@ public class Display.DisplayWidget : Gtk.Box {
+ 
+                 frequencies += mode.frequency;
+ 
+-                var freq_name = _("%g Hz").printf (Math.roundf ((float)mode.frequency));
++                string freq_name;
++                if (mode.is_variable_refresh_rate) {
++                    // With Variable Refresh Rate the mode's rate is the maximum the display may run at
++                    freq_name = _("Up to %g Hz").printf (Math.roundf ((float)mode.frequency));
++                } else {
++                    freq_name = _("%g Hz").printf (Math.roundf ((float)mode.frequency));
++                }
++
+                 refresh_list_store.append (out iter);
+                 refresh_list_store.set (iter, ResolutionColumns.NAME, freq_name, RefreshColumns.VALUE, mode);
+                 added++;
+@@ -488,6 +526,19 @@ public class Display.DisplayWidget : Gtk.Box {
+ 
+     private void on_monitor_modes_changed () {
+         set_active_resolution_from_current_mode ();
++        update_vrr_switch ();
++    }
++
++    private void update_vrr_switch () {
++        vrr_switch.visible = virtual_monitor.supports_variable_refresh_rate;
++        vrr_switch.active = virtual_monitor.variable_refresh_rate;
++
++        var min_refresh_rate = virtual_monitor.is_mirror ? 0 : virtual_monitor.monitor.min_refresh_rate;
++        if (min_refresh_rate > 0) {
++            vrr_switch.tooltip_text = _("Lowest refresh rate: %d Hz").printf (min_refresh_rate);
++        } else {
++            vrr_switch.tooltip_text = null;
++        }
+     }
+ 
+     private bool set_active_resolution_from_current_mode () {

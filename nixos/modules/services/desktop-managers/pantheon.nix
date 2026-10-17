@@ -324,6 +324,7 @@ in
     })
 
     (mkIf serviceCfg.apps.enable {
+
       environment.systemPackages = utils.removePackagesByName (
         [
           pkgs.epiphany
