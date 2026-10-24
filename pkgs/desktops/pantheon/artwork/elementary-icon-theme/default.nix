@@ -6,21 +6,22 @@
   meson,
   ninja,
   adwaita-icon-theme,
+  granite9,
   hicolor-icon-theme,
   gtk3,
   xcursorgen,
   librsvg,
 }:
 
-stdenvNoCC.mkDerivation rec {
+stdenvNoCC.mkDerivation {
   pname = "elementary-icon-theme";
-  version = "9.0.0";
+  version = "9.0.0-unstable-2026-10-21"; # nixpkgs-update: no auto update
 
   src = fetchFromGitHub {
     owner = "elementary";
     repo = "icons";
-    tag = version;
-    hash = "sha256-WrZxhr7ybIx9CK5zG5Fq6udPt+0HRQIPSwxkCF2tPps=";
+    rev = "06f800211c916120dd8e68ab5b60f4cc4c96f190";
+    hash = "sha256-xFP2uF+gGclmsJMqYhfwj8+QDe70b9VDtTl7f6/CvEs=";
   };
 
   nativeBuildInputs = [
@@ -33,6 +34,7 @@ stdenvNoCC.mkDerivation rec {
 
   propagatedBuildInputs = [
     adwaita-icon-theme
+    granite9
     hicolor-icon-theme
   ];
 
@@ -42,14 +44,6 @@ stdenvNoCC.mkDerivation rec {
     "-Dvolume_icons=false" # Tries to install some icons to /
     "-Dpalettes=false" # Don't install gimp and inkscape palette files
   ];
-
-  postPatch = ''
-    # Upstream removed the non-fd.o office-calendar icons but left these
-    # alias symlinks dangling (elementary/icons#1435).
-    rm -f apps/16/calendar.svg \
-      mimes/symbolic/text-calendar-symbolic.svg \
-      mimes/symbolic/vcalendar-symbolic.svg
-  '';
 
   postFixup = "gtk-update-icon-cache $out/share/icons/elementary";
 

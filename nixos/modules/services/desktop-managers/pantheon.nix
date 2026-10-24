@@ -107,9 +107,12 @@ in
 
   config = mkMerge [
     (mkIf cfg.enable {
-      services.desktopManager.pantheon.sessionPath = utils.removePackagesByName [
-        pkgs.pantheon.pantheon-agent-geoclue2
-      ] config.environment.pantheon.excludePackages;
+      services.desktopManager.pantheon.sessionPath =
+        utils.removePackagesByName [
+          pkgs.pantheon.pantheon-agent-geoclue2
+        ] config.environment.pantheon.excludePackages
+        # The Sharing settings only offer Remote Desktop when its GSettings schema is found.
+        ++ optional config.services.gnome.gnome-remote-desktop.enable pkgs.gnome-remote-desktop;
 
       services.displayManager.sessionPackages = [ pkgs.pantheon.elementary-session-settings ];
 
@@ -324,6 +327,7 @@ in
     })
 
     (mkIf serviceCfg.apps.enable {
+
       environment.systemPackages = utils.removePackagesByName (
         [
           pkgs.epiphany

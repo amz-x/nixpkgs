@@ -12,22 +12,22 @@
   elementary-settings-daemon,
   glib,
   gnome-settings-daemon,
-  granite7,
+  granite9,
   gtk4,
   libadwaita,
   libgee,
   pantheon-wayland,
 }:
 
-stdenv.mkDerivation rec {
+stdenv.mkDerivation {
   pname = "elementary-onboarding";
-  version = "8.1.0";
+  version = "8.1.0-unstable-2026-10-20"; # nixpkgs-update: no auto update
 
   src = fetchFromGitHub {
     owner = "elementary";
     repo = "onboarding";
-    rev = version;
-    hash = "sha256-y5qMZoVqFpE3d6PRKDO1ldMULCaH3S4phJgAMhY2dSg=";
+    rev = "70962d1850d572af4763753d0d61334f5a237e05";
+    hash = "sha256-6q6s5LJk4Pgim4kNvhA5+knz2vLAC7jecBZDaBlUSsE=";
   };
 
   nativeBuildInputs = [
@@ -43,7 +43,7 @@ stdenv.mkDerivation rec {
     elementary-settings-daemon # settings schema
     glib
     gnome-settings-daemon # org.gnome.settings-daemon.plugins.color
-    granite7
+    granite9
     gtk4
     libadwaita
     libgee

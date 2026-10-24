@@ -4,10 +4,13 @@
   fetchFromGitHub,
   electron_42,
   copyDesktopItems,
+  glib,
+  ivpn,
   makeDesktopItem,
   nix-update-script,
   makeWrapper,
   ivpn-service,
+  openssl,
 }:
 buildNpmPackage (finalAttrs: {
   pname = "ivpn-ui";
@@ -36,6 +39,15 @@ buildNpmPackage (finalAttrs: {
   postPatch = ''
     substituteInPlace package.json \
       --replace-fail '"postinstall": "node node_modules/electron/install.js && electron-builder install-app-deps",' ""
+
+    # Split tunnel apps are launched through the CLI, and the icon theme for the
+    # app list comes from gsettings; both are hardcoded to /usr/bin.
+    substituteInPlace src/daemon-client/index.js \
+      --replace-fail '`/usr/bin/ivpn exclude ' '`${lib.getExe ivpn} exclude ' \
+      --replace-fail '"/usr/bin/gsettings get' '"${lib.getExe' glib.bin "gsettings"} get'
+
+    substituteInPlace src/helpers/main_platform.js \
+      --replace-fail '"/usr/bin/openssl"' '"${lib.getExe openssl}"'
   '';
 
   postBuild = ''

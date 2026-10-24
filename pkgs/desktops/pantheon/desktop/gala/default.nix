@@ -1,42 +1,48 @@
 {
-  stdenv,
-  lib,
-  fetchFromGitHub,
-  desktop-file-utils,
-  gettext,
-  libxml2,
-  meson,
-  ninja,
-  pkg-config,
-  vala,
-  wayland-scanner,
-  wrapGAppsHook4,
+  accountsservice,
   at-spi2-core,
-  gnome-settings-daemon,
+  desktop-file-utils,
+  fetchFromGitHub,
+  gettext,
+  glycin-loaders,
   gnome-desktop,
+  gnome-settings-daemon,
   granite,
   granite7,
   gtk3,
   gtk4,
   ibus,
   json-glib,
+  lcms2,
+  lib,
   libgee,
   libhandy,
+  libxi,
+  libxkbcommon,
+  libxml2,
+  libxslt,
+  meson,
   mutter,
-  sqlite,
   systemdLibs,
+  ninja,
   nix-update-script,
+  pkg-config,
+  sqlite,
+  stdenv,
+  vala,
+  wayland-scanner,
+  wrapGAppsHook4,
 }:
 
 stdenv.mkDerivation (finalAttrs: {
   pname = "gala";
-  version = "8.6.2";
+  version = "8.6.2-unstable-2026-10-13"; # nixpkgs-update: no auto update
 
   src = fetchFromGitHub {
     owner = "elementary";
     repo = "gala";
-    tag = finalAttrs.version;
-    hash = "sha256-M3EqQS7xJbNryQ2emJdhOZfm1l2iO6qmG0X/6cRwpN4=";
+    rev = "f54c9161cae24b479fa78e108122f7ec4fddaf77";
+    hash = "sha256-aKaeamz9kT8M9fAijhSFf++ZuZFANV4SZ+O+4mbLJa4=";
   };
 
   depsBuildBuild = [ pkg-config ];
@@ -45,6 +51,7 @@ stdenv.mkDerivation (finalAttrs: {
     desktop-file-utils
     gettext
     libxml2
+    libxslt
     meson
     ninja
     pkg-config
@@ -54,21 +61,33 @@ stdenv.mkDerivation (finalAttrs: {
   ];
 
   buildInputs = [
+    accountsservice
     at-spi2-core
-    gnome-settings-daemon
+    glycin-loaders
     gnome-desktop
+    gnome-settings-daemon
     granite
     granite7
     gtk3 # daemon-gtk3
     gtk4
     ibus
     json-glib
+    lcms2
     libgee
     libhandy
+    libxi
+    libxkbcommon
     mutter
     sqlite
     systemdLibs
   ];
+
+  preFixup = ''
+    # Needed for setting background images.
+    gappsWrapperArgs+=(
+      --prefix XDG_DATA_DIRS : "${glycin-loaders}/share"
+    )
+  '';
 
   postPatch = ''
     substituteInPlace meson.build \

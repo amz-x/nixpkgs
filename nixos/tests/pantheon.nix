@@ -25,8 +25,13 @@
     {
       imports = [ ./common/user-account.nix ];
 
-      # Workaround ".gala-wrapped invoked oom-killer"
-      virtualisation.memorySize = 2047;
+      # Workaround ".gala-wrapped invoked oom-killer". The greeter phase
+      # runs a second gala+login UI on top of the real session's own
+      # gala+apps once logged in, and locking the screen (tested below)
+      # briefly runs a *third* gala+greeter instance for the fresh
+      # unlock session on top of that, so give this more headroom than
+      # a single-session Pantheon desktop needs.
+      virtualisation.memorySize = 2048;
 
       services.xserver.enable = true;
       services.desktopManager.pantheon.enable = true;
@@ -34,8 +39,14 @@
       # We ship pantheon.appcenter by default when this is enabled.
       services.flatpak.enable = true;
 
-      # For basic OCR tests.
-      environment.systemPackages = [ videosAutostart ];
+      # For basic OCR tests, and an RDP client to log in to the Remote Desktop page's server.
+      environment.systemPackages = [
+        videosAutostart
+        pkgs.freerdp
+      ];
+
+      # Makes the Remote Desktop page of the Sharing settings available.
+      services.gnome.gnome-remote-desktop.enable = true;
 
       # We don't ship gnome-text-editor in Pantheon module, we add this line mainly
       # to catch eval issues related to this option.
@@ -52,17 +63,24 @@
       user = nodes.machine.users.users.alice;
     in
     ''
+      import datetime
+      import re
+
       machine.wait_for_unit("display-manager.service")
 
       with subtest("Test we can see usernames in elementary-greeter"):
           machine.wait_for_text("${user.description}")
-          machine.wait_until_succeeds("pgrep -f io.elementary.greeter-compositor")
+          # Gala is executed directly as the greeter's compositor and spawns
+          # the actual login UI itself; bracket the first letter so pgrep
+          # doesn't match its own invocation (it's run as `bash -c "pgrep
+          # -f ..."`, which contains the pattern in its own cmdline).
+          machine.wait_until_succeeds("pgrep -f '[i]o.elementary.greeter$'")
           # Ensure the password box is focused by clicking it.
           # Workaround for https://github.com/NixOS/nixpkgs/issues/211366.
-          machine.succeed("ydotool mousemove -a 220 275")
+          machine.succeed("ydotool mousemove -a 309 286")
           machine.succeed("ydotool click 0xC0")
           machine.sleep(2)
-          machine.screenshot("elementary_greeter_lightdm")
+          machine.screenshot("greeter")
 
       with subtest("Login with elementary-greeter"):
           machine.send_chars("${user.password}\n")
@@ -70,6 +88,18 @@
 
       with subtest("Wait for wayland server"):
           machine.wait_for_file("/run/user/${toString user.uid}/wayland-0")
+
+      with subtest("LightDM started a Wayland session, not an X session"):
+          # The user's graphical session, as opposed to the systemd --user manager one.
+          session = machine.succeed("loginctl show-user ${user.name} -p Display --value").strip()
+          props = machine.succeed(f"loginctl show-session {session} -p Type -p Desktop -p TTY -p Service")
+          assert "Type=wayland" in props, props
+          assert "Desktop=pantheon-wayland" in props, props
+          assert "Service=lightdm" in props, props
+          # LightDM used to pass /dev/tty/N and a stale greeter PAM_TTY for Wayland sessions.
+          assert re.search(r"^TTY=tty[0-9]+$", props, re.M), props
+          # Neither the greeter nor the session should need an X server (gala runs Xwayland itself).
+          machine.fail("pgrep -x Xorg")
 
       with subtest("Check that logging in has given the user ownership of devices"):
           # Change back to /dev/snd/timer after systemd-258.1
@@ -120,11 +150,135 @@
           machine.screenshot("multitasking")
           machine.succeed(f"su - ${user.name} -c '{env} {cmd}'")
 
+      with subtest("Archive actions are offered and work via contractor"):
+          # The elementary-files application gets "Compress"/"Extract Here"
+          # from contractor (file-roller-contract) through granite's ContractorProxy,
+          # so these only show up if granite and contractor agree on the D-Bus name.
+          env = "DBUS_SESSION_BUS_ADDRESS=unix:path=/run/user/${toString user.uid}/bus WAYLAND_DISPLAY=wayland-0 XDG_RUNTIME_DIR=/run/user/${toString user.uid}"
+          contractor = "gdbus call --session --dest io.elementary.Contractor --object-path /io/elementary/contractor --method io.elementary.Contractor.ExecuteWithUri"
+          home = "${user.home}"
+          machine.succeed(
+              f"su - ${user.name} -c 'mkdir -p {home}/archives/folder {home}/archives/inner"
+              f" && echo foo > {home}/archives/folder/a.txt && echo bar > {home}/archives/inner/b.txt"
+              f" && tar -czf {home}/archives/archive.tar.gz -C {home}/archives inner && rm -r {home}/archives/inner'"
+          )
+
+          # Passing a file selects it; the menu key opens its context menu.
+          machine.execute(f"su - ${user.name} -c '{env} io.elementary.files {home}/archives/archive.tar.gz >&2 &'")
+          machine.sleep(8)
+          machine.send_key("menu")
+          machine.wait_for_text("Extract Here")
+          machine.screenshot("files_extract_menu")
+          machine.send_key("esc")
+          machine.succeed(f"su - ${user.name} -c '{env} {contractor} io.elementary.contractor.file-roller-extract-here file://{home}/archives/archive.tar.gz'")
+          machine.wait_until_succeeds(f"grep -q bar {home}/archives/inner/b.txt")
+
+          # With nothing selected, the background menu acts on the folder itself.
+          machine.execute(f"su - ${user.name} -c '{env} io.elementary.files -n {home}/archives/folder >&2 &'")
+          machine.sleep(8)
+          machine.send_key("menu")
+          machine.wait_for_text("Compress")
+          machine.screenshot("files_compress_menu")
+          machine.send_key("esc")
+          machine.succeed(f"su - ${user.name} -c '{env} {contractor} io.elementary.contractor.file-roller-compress file://{home}/archives/folder'")
+
+          # File Roller's dialog defaults to folder.tar.gz next to the folder.
+          machine.wait_for_text("Extension")
+          machine.screenshot("file_roller_compress")
+          machine.send_key("ret")
+          machine.wait_until_succeeds(f"tar -tzf {home}/archives/folder.tar.gz | grep -q folder/a.txt")
+          machine.execute("pkill -f io.elementary.files")
+
+      with subtest("Files' Open in > Terminal adds a tab to an already running terminal"):
+          env = "DBUS_SESSION_BUS_ADDRESS=unix:path=/run/user/${toString user.uid}/bus WAYLAND_DISPLAY=wayland-0 XDG_RUNTIME_DIR=/run/user/${toString user.uid}"
+          home = "${user.home}"
+          # The terminal's shells are its direct children.
+          shell_cwds = (
+              "t=$(pgrep -f '^[^ ]*io.elementary.terminal' | head -1);"
+              " for p in $(pgrep -P $t); do readlink /proc/$p/cwd; done"
+          )
+          machine.succeed(f"su - ${user.name} -c 'mkdir -p {home}/terminal-here/target'")
+          machine.execute(f"su - ${user.name} -c '{env} io.elementary.terminal >&2 &'")
+          machine.wait_until_succeeds(f"{shell_cwds} | grep -qx {home}")
+
+          machine.execute(f"su - ${user.name} -c '{env} io.elementary.files -n {home}/terminal-here >&2 &'")
+          machine.wait_for_text("target")
+          machine.sleep(2)
+          # Select the only folder, then context menu > Open in > Terminal.
+          machine.send_key("end")
+          machine.send_key("menu")
+          machine.wait_for_text("Rename")
+          for key in ["down", "down", "right", "down", "down", "down"]:
+              machine.send_key(key)
+          machine.screenshot("files_open_in_terminal")
+          machine.send_key("ret")
+          machine.wait_until_succeeds(f"{shell_cwds} | grep -qx {home}/terminal-here/target")
+
+          # The terminal must have been raised with that tab selected.
+          machine.sleep(2)
+          machine.send_chars("touch focused\n")
+          machine.wait_for_file(f"{home}/terminal-here/target/focused")
+          machine.screenshot("terminal_here")
+          machine.execute("pkill -f io.elementary.files; pkill -f io.elementary.terminal")
+
+      with subtest("Remote Desktop in the Sharing settings serves RDP"):
+          bus = "DBUS_SESSION_BUS_ADDRESS=unix:path=/run/user/${toString user.uid}/bus XDG_RUNTIME_DIR=/run/user/${toString user.uid}"
+          env = f"{bus} WAYLAND_DISPLAY=wayland-0 XDG_CURRENT_DESKTOP=Pantheon"
+          rdp_listening = "ss -ltn | grep -q ':3389 '"
+          machine.execute(f"su - ${user.name} -c '{env} io.elementary.settings settings://network/share >&2 &'")
+          machine.wait_for_text("Remote Desktop")
+          machine.sleep(2)
+          # ydotool coordinates are half of the screenshot's: the Remote Desktop sidebar row.
+          machine.succeed("ydotool mousemove -a 166 150")
+          machine.succeed("ydotool click 0xC0")
+          machine.wait_for_text("Allow connected devices")
+          machine.fail(rdp_listening)
+
+          # The page's header switch sets up a certificate and credentials, then starts the daemon.
+          machine.succeed("ydotool mousemove -a 490 90")
+          machine.succeed("ydotool click 0xC0")
+          machine.wait_until_succeeds(rdp_listening)
+          machine.screenshot("remote_desktop_enabled")
+          status = machine.succeed(f"su - ${user.name} -c '{bus} grdctl status --show-credentials'")
+          match = re.search(r"Password: (\S+)", status)
+          assert match, f"no RDP password was generated:\n{status}"
+          machine.succeed(f"xfreerdp /v:127.0.0.1 /u:${user.name} /p:{match.group(1)} /cert:ignore +auth-only")
+          machine.fail("xfreerdp /v:127.0.0.1 /u:${user.name} /p:wrong-password /cert:ignore +auth-only")
+
+          machine.succeed("ydotool click 0xC0")
+          machine.wait_until_fails(rdp_listening)
+          machine.execute("pkill -f 'io.elementary.settings settings://'")
+
+      with subtest("Lock the screen"):
+          # Gala's SessionLocker doesn't have an in-session unlock UI yet
+          # (see the comment on LockScreenManager.manually_locked upstream)
+          # -- it just shows a black shield actor and, on user activity,
+          # switches back to a fresh LightDM greeter session to unlock. So
+          # we can only assert on the locked state itself here, via the
+          # org.gnome.ScreenSaver D-Bus interface gala also exposes.
+          env = "DBUS_SESSION_BUS_ADDRESS=unix:path=/run/user/${toString user.uid}/bus"
+          lock_cmd = "dbus-send --session --dest=org.gnome.ScreenSaver --print-reply /org/gnome/ScreenSaver org.gnome.ScreenSaver.Lock"
+          get_active_cmd = "dbus-send --session --dest=org.gnome.ScreenSaver --print-reply /org/gnome/ScreenSaver org.gnome.ScreenSaver.GetActive"
+          machine.succeed(f"su - ${user.name} -c '{env} {lock_cmd}'")
+          machine.wait_until_succeeds(f"su - ${user.name} -c '{env} {get_active_cmd}' | grep -q 'boolean true'")
+          machine.sleep(2)
+          machine.screenshot("locked")
+
+      with subtest("Unlock the screen"):
+          machine.send_chars(" ")
+          machine.sleep(15)
+          machine.succeed("ydotool mousemove -a 309 286")
+          machine.succeed("ydotool click 0xC0")
+          machine.sleep(2)
+          machine.send_chars("${user.password}\n")
+          machine.sleep(datetime.timedelta(milliseconds=250))
+          machine.screenshot("unlocking")
+
       with subtest("Check if gala has ever coredumped"):
           machine.fail("coredumpctl --json=short | grep gala")
           # So we can see the dock.
           machine.execute("pkill -f -9 io.elementary.videos")
           machine.sleep(10)
-          machine.screenshot("screen")
+          machine.screenshot("desktop")
     '';
 }

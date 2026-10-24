@@ -1,0 +1,103 @@
+diff -ru a/proton/vpn/daemon/split_tunneling/apps/process_matcher.py b/proton/vpn/daemon/split_tunneling/apps/process_matcher.py
+--- a/proton/vpn/daemon/split_tunneling/apps/process_matcher.py
++++ b/proton/vpn/daemon/split_tunneling/apps/process_matcher.py
+@@ -18,6 +18,7 @@
+ """
+ 
+ from dataclasses import dataclass, field
++import os
+ import time
+ 
+ import psutil
+@@ -37,6 +38,8 @@
+     pid: int
+     ppid: int
+     exe: str
++    # full command line, needed for interpreted programs whose exe is the interpreter
++    cmdline: str = ""
+ 
+     # configured ST paths this process matched against
+     matched_config_paths: set[str] = field(default_factory=set)
+@@ -52,14 +55,16 @@
+         uid = process.uids().real
+         ppid = process.ppid()
+         exe = ""
++        cmdline = ""
+         try:
+             exe = process.exe()
++            cmdline = " ".join(process.cmdline())
+         except (psutil.AccessDenied, psutil.ZombieProcess) as error:
+             # Even when running as root, some processes raise this
+             logger.warning("Error getting process path: %s: %s", type(error).__name__, error)
+ 
+         return Process(
+-            pid=process.pid, uid=uid, ppid=ppid, exe=exe
++            pid=process.pid, uid=uid, ppid=ppid, exe=exe, cmdline=cmdline
+         )
+ 
+ 
+@@ -85,18 +90,31 @@
+         # In include mode, the Proton VPN app should always be included in the VPN
+         # so that it can establish the local agent connection to the VPN server.
+         config = config_by_uid[process.uid]
+-        if config.mode == SplitTunnelingMode.INCLUDE and cls.VPN_APP_BIN in process.exe:
++        if config.mode == SplitTunnelingMode.INCLUDE and (
++                cls.VPN_APP_BIN in process.exe or cls.VPN_APP_BIN in process.cmdline
++        ):
+             return set([cls.VPN_APP_BIN])
+ 
+         matches = set()
+         for app_path in config.app_paths:
+             if not app_path:
+                 continue
+-            if process.exe.startswith(app_path):
++            if any(process.exe.startswith(path) for path in cls._resolve_app_path(app_path)):
+                 matches.add(app_path)
+ 
+         return matches
+ 
++    @staticmethod
++    def _resolve_app_path(app_path: str) -> set[str]:
++        """
++        Returns the configured path together with the paths a running process started
++        from it reports as its exe: the symlink target (e.g. /run/current-system/sw/bin/foo
++        -> /nix/store/...-foo/bin/foo) and the Nix wrapper target (.foo-wrapped).
++        """
++        real_path = os.path.realpath(app_path)
++        directory, name = os.path.split(real_path)
++        return {app_path, real_path, os.path.join(directory, f".{name}-wrapped")}
++
+     @classmethod
+     def check_all_processes(cls, config_by_uid) -> dict[int, Process]:
+         """
+diff -ru a/tests/test_process_matcher.py b/tests/test_process_matcher.py
+--- a/tests/test_process_matcher.py
++++ b/tests/test_process_matcher.py
+@@ -39,3 +39,27 @@
+ 
+     assert matches == set()
+ 
++
++def test_check_process_returns_match_when_vpn_client_is_run_by_an_interpreter():
++    process = Process(
++        uid=1000, pid=1234, ppid=1233, exe="/usr/bin/python3",
++        cmdline="/usr/bin/python3 /usr/bin/protonvpn-app"
++    )
++    config_by_uid = {1000: SplitTunnelingConfig(mode=SplitTunnelingMode.INCLUDE)}
++
++    matches = ProcessMatcher.check_process(process, config_by_uid)
++
++    assert matches == set([ProcessMatcher.VPN_APP_BIN])
++
++
++def test_check_process_returns_match_when_process_exe_is_symlink_target(tmp_path):
++    target = tmp_path / "store" / "bin" / "foo"
++    target.parent.mkdir(parents=True)
++    target.touch()
++    app_path = tmp_path / "foo"
++    app_path.symlink_to(target)
++    config_by_uid = {1000: SplitTunnelingConfig(mode=SplitTunnelingMode.INCLUDE, app_paths=[str(app_path)])}
++
++    for exe in (target, target.parent / ".foo-wrapped"):
++        process = Process(uid=1000, pid=1234, ppid=1233, exe=str(exe))
++        assert ProcessMatcher.check_process(process, config_by_uid) == set([str(app_path)])

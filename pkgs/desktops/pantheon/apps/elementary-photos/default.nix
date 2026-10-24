@@ -24,15 +24,15 @@
   wrapGAppsHook3,
 }:
 
-stdenv.mkDerivation rec {
+stdenv.mkDerivation {
   pname = "elementary-photos";
-  version = "8.0.2";
+  version = "8.0.2-unstable-2026-10-13"; # nixpkgs-update: no auto update
 
   src = fetchFromGitHub {
     owner = "elementary";
     repo = "photos";
-    rev = version;
-    hash = "sha256-weJ061ofCwOzq5gFRNxoW1GgSkEkr68cBNbyBfgCECc=";
+    rev = "9b05141b76d55b75cfd76c5441cdb8673f8a9f3d";
+    hash = "sha256-mRGdR8hb6/ef86nG0aRgHxfIbb/DHZX+Xb2+XOYUTiU=";
   };
 
   nativeBuildInputs = [

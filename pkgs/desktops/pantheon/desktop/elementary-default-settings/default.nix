@@ -8,20 +8,21 @@
   nixos-artwork,
   glib,
   pkg-config,
+  accountsservice,
   dbus,
   polkit,
-  accountsservice,
+  systemdLibs
 }:
 
-stdenv.mkDerivation rec {
+stdenv.mkDerivation {
   pname = "elementary-default-settings";
-  version = "8.1.1";
+  version = "8.1.1-unstable-2026-10-13"; # nixpkgs-update: no auto update
 
   src = fetchFromGitHub {
     owner = "elementary";
     repo = "default-settings";
-    tag = version;
-    hash = "sha256-eH8bnfncyBMD7qPkdBy3zSBb79s1ALDLM58wae9hzPg=";
+    rev = "915d1a0b63865ce3f0d44a68318d55ef9ca90fe6";
+    hash = "sha256-OuCad68xQYGunYidDnYXPOBckysqSpiuBvSG16ubS6s=";
   };
 
   nativeBuildInputs = [
@@ -35,6 +36,7 @@ stdenv.mkDerivation rec {
     accountsservice
     dbus
     polkit
+    systemdLibs
   ];
 
   mesonFlags = [

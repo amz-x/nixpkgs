@@ -24,7 +24,7 @@ stdenv.mkDerivation (finalAttrs: {
   src = fetchFromGitHub {
     owner = "elementary";
     repo = "maps";
-    rev = finalAttrs.version;
+    tag = finalAttrs.version;
     hash = "sha256-ZXJp6LoR7+3v6Gqs2y04M/+UJN2CTpijHnJozd4fAls=";
   };
 

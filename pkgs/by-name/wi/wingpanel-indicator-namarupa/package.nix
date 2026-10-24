@@ -1,37 +1,27 @@
 {
   lib,
-  stdenv,
   fetchFromGitHub,
-  unstableGitUpdater,
-  replaceVars,
+  fetchpatch,
+  stdenv,
   meson,
   ninja,
   pkg-config,
   vala,
-  gtk3,
+  gtk4,
   libgee,
-  libindicator,
   pantheon,
-  indicator-application-gtk3,
 }:
 
 stdenv.mkDerivation {
   pname = "wingpanel-indicator-namarupa";
-  version = "0.0.0-unstable-2024-12-17";
+  version = "0.0.0-unstable-2026-09-24"; # nixpkgs-update: no auto update
 
   src = fetchFromGitHub {
-    owner = "lenemter";
+    owner = "amz-x";
     repo = "wingpanel-indicator-namarupa";
-    rev = "d9fc4e47d58c72e0cf08aa11246910ce84fcef50";
-    sha256 = "sha256-8jzhrCMkP5ui964JRZUs+tl2ShxeB8q60fBUI4okrpg=";
+    rev = "d3b197bc31c1ef7b6c2f1a2b52e1904bbd67b04a";
+    sha256 = "sha256-DrJ5ot7ultpVlMvdv6aJDP+IfUd++YLccI24sfXUgQ0=";
   };
-
-  patches = [
-    # Tells the indicator the path for libapplication.so
-    (replaceVars ./fix-meson-build.patch {
-      indicator_application = indicator-application-gtk3;
-    })
-  ];
 
   nativeBuildInputs = [
     meson
@@ -41,22 +31,15 @@ stdenv.mkDerivation {
   ];
 
   buildInputs = [
-    gtk3
+    gtk4
     libgee
-    libindicator
-    pantheon.granite
+    pantheon.granite7
     pantheon.wingpanel
   ];
 
-  passthru = {
-    updateScript = unstableGitUpdater {
-      url = "https://github.com/lenemter/wingpanel-indicator-namarupa.git";
-    };
-  };
-
   meta = {
-    description = "Wingpanel Namarupa Indicator (Ayatana support)";
-    homepage = "https://github.com/lenemter/wingpanel-indicator-namarupa";
+    description = "Wingpanel indicator that shows StatusNotifierItem (ayatana/appindicator) tray icons";
+    homepage = "https://github.com/amz-x/wingpanel-indicator-namarupa";
     license = lib.licenses.lgpl21Plus;
     platforms = lib.platforms.linux;
     teams = [ lib.teams.pantheon ];

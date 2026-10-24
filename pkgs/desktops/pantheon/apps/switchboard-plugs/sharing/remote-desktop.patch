@@ -1,0 +1,584 @@
+From 7d4c50d0fd1a8a44a566977850fec4c74c667b8c Mon Sep 17 00:00:00 2001
+From: Christopher Crouse <mail@amz-x.com>
+Date: Sat, 24 Oct 2026 19:21:35 +0200
+Subject: [PATCH] Add Remote Desktop page using GNOME Remote Desktop
+
+Lets the computer's screen be shared and optionally controlled over RDP
+through gnome-remote-desktop. The page is only shown when
+gnome-remote-desktop's settings schema is installed.
+
+Turning it on sets up what the user daemon needs before it serves RDP: a
+self-signed TLS certificate (generated with GnuTLS and stored where GNOME
+Settings keeps it), credentials in the keyring (the user name and a random
+password unless already set), then enables and starts
+gnome-remote-desktop.service.
+
+Based on the idea of #60 by DJABhipHop, ported to GTK4 and the current
+SettingsPage layout.
+
+Fixes #56
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+---
+ po/POTFILES                        |   1 +
+ src/Backend/Gnutls.c               | 108 +++++++++++++++
+ src/Backend/RemoteDesktop.vala     | 145 ++++++++++++++++++++
+ src/Plug.vala                      |   9 ++
+ src/Widgets/RemoteDesktopPage.vala | 211 +++++++++++++++++++++++++++++
+ src/meson.build                    |   7 +-
+ 6 files changed, 480 insertions(+), 1 deletion(-)
+ create mode 100644 src/Backend/Gnutls.c
+ create mode 100644 src/Backend/RemoteDesktop.vala
+ create mode 100644 src/Widgets/RemoteDesktopPage.vala
+
+diff --git a/po/POTFILES b/po/POTFILES
+index 33d40e4..2ad7401 100644
+--- a/po/POTFILES
++++ b/po/POTFILES
+@@ -1,6 +1,7 @@
+ src/Plug.vala
+ src/Widgets/DLNAPage.vala
+ src/Widgets/BluetoothPage.vala
++src/Widgets/RemoteDesktopPage.vala
+ src/Backend/RygelStartupManager.vala
+ src/Backend/RygelConfigFile.vala
+ src/Backend/SharingDBusInterface.vala
+diff --git a/src/Backend/Gnutls.c b/src/Backend/Gnutls.c
+new file mode 100644
+index 0000000..9511023
+--- /dev/null
++++ b/src/Backend/Gnutls.c
+@@ -0,0 +1,108 @@
++/*
++ * SPDX-License-Identifier: GPL-2.0-or-later
++ * SPDX-FileCopyrightText: 2026 elementary, Inc. (https://elementary.io)
++ */
++
++#include <string.h>
++#include <time.h>
++#include <gio/gio.h>
++#include <gnutls/gnutls.h>
++#include <gnutls/crypto.h>
++#include <gnutls/x509.h>
++
++#define CERTIFICATE_LIFETIME_DAYS 730
++
++static gboolean
++check_gnutls (int ret, const char *what, GError **error)
++{
++    if (ret >= 0) {
++        return TRUE;
++    }
++
++    g_set_error (error, G_IO_ERROR, G_IO_ERROR_FAILED, "Failed to %s: %s", what, gnutls_strerror (ret));
++    return FALSE;
++}
++
++/*
++ * Creates a self-signed certificate and its private key for the RDP server
++ * and writes them to the given paths in PEM format.
++ */
++gboolean
++sharing_backend_generate_tls_certificate (const char *cert_path, const char *key_path, const char *common_name, GError **error)
++{
++    gnutls_x509_privkey_t key = NULL;
++    gnutls_x509_crt_t crt = NULL;
++    gnutls_datum_t key_pem = { NULL, 0 };
++    gnutls_datum_t crt_pem = { NULL, 0 };
++    unsigned char serial[16];
++    time_t now = time (NULL);
++    gboolean success = FALSE;
++
++    if (!check_gnutls (gnutls_x509_privkey_init (&key), "initialize private key", error) ||
++        !check_gnutls (gnutls_x509_privkey_generate (key, GNUTLS_PK_RSA, 4096, 0), "generate private key", error) ||
++        !check_gnutls (gnutls_x509_crt_init (&crt), "initialize certificate", error) ||
++        !check_gnutls (gnutls_x509_crt_set_version (crt, 3), "set certificate version", error) ||
++        !check_gnutls (gnutls_rnd (GNUTLS_RND_NONCE, serial, sizeof (serial)), "generate serial number", error)) {
++        goto out;
++    }
++
++    /* Serial numbers must be positive */
++    serial[0] &= 0x7f;
++
++    if (!check_gnutls (gnutls_x509_crt_set_serial (crt, serial, sizeof (serial)), "set serial number", error) ||
++        !check_gnutls (gnutls_x509_crt_set_activation_time (crt, now), "set activation time", error) ||
++        !check_gnutls (gnutls_x509_crt_set_expiration_time (crt, now + (time_t) CERTIFICATE_LIFETIME_DAYS * 24 * 60 * 60), "set expiration time", error) ||
++        !check_gnutls (gnutls_x509_crt_set_dn_by_oid (crt, GNUTLS_OID_X520_COMMON_NAME, 0, common_name, strlen (common_name)), "set common name", error) ||
++        !check_gnutls (gnutls_x509_crt_set_key (crt, key), "set certificate key", error) ||
++        !check_gnutls (gnutls_x509_crt_set_key_usage (crt, GNUTLS_KEY_DIGITAL_SIGNATURE | GNUTLS_KEY_KEY_ENCIPHERMENT), "set key usage", error) ||
++        !check_gnutls (gnutls_x509_crt_set_key_purpose_oid (crt, GNUTLS_KP_TLS_WWW_SERVER, 0), "set key purpose", error) ||
++        !check_gnutls (gnutls_x509_crt_sign2 (crt, crt, key, GNUTLS_DIG_SHA256, 0), "sign certificate", error) ||
++        !check_gnutls (gnutls_x509_privkey_export2 (key, GNUTLS_X509_FMT_PEM, &key_pem), "export private key", error) ||
++        !check_gnutls (gnutls_x509_crt_export2 (crt, GNUTLS_X509_FMT_PEM, &crt_pem), "export certificate", error)) {
++        goto out;
++    }
++
++    if (!g_file_set_contents_full (key_path, (const char *) key_pem.data, key_pem.size, G_FILE_SET_CONTENTS_CONSISTENT, 0600, error) ||
++        !g_file_set_contents_full (cert_path, (const char *) crt_pem.data, crt_pem.size, G_FILE_SET_CONTENTS_CONSISTENT, 0644, error)) {
++        goto out;
++    }
++
++    success = TRUE;
++
++out:
++    gnutls_free (key_pem.data);
++    gnutls_free (crt_pem.data);
++    if (crt != NULL) {
++        gnutls_x509_crt_deinit (crt);
++    }
++    if (key != NULL) {
++        gnutls_x509_privkey_deinit (key);
++    }
++
++    return success;
++}
++
++/*
++ * Returns a random password for the RDP credentials, or NULL on failure.
++ * Ambiguous characters (0/O, 1/l/I) are left out so it can be read off the screen.
++ */
++char *
++sharing_backend_generate_password (void)
++{
++    static const char characters[] = "abcdefghijkmnopqrstuvwxyzABCDEFGHJKLMNPQRSTUVWXYZ23456789";
++    unsigned char random[16];
++    char *password;
++
++    if (gnutls_rnd (GNUTLS_RND_KEY, random, sizeof (random)) < 0) {
++        return NULL;
++    }
++
++    password = g_malloc (sizeof (random) + 1);
++    for (gsize i = 0; i < sizeof (random); i++) {
++        /* 256 is not a multiple of the alphabet size; the bias is negligible here */
++        password[i] = characters[random[i] % (sizeof (characters) - 1)];
++    }
++    password[sizeof (random)] = '\0';
++
++    return password;
++}
+diff --git a/src/Backend/RemoteDesktop.vala b/src/Backend/RemoteDesktop.vala
+new file mode 100644
+index 0000000..7154838
+--- /dev/null
++++ b/src/Backend/RemoteDesktop.vala
+@@ -0,0 +1,145 @@
++/*
++ * SPDX-License-Identifier: GPL-2.0-or-later
++ * SPDX-FileCopyrightText: 2026 elementary, Inc. (https://elementary.io)
++ */
++
++namespace Sharing.Backend {
++    [CCode (cname = "sharing_backend_generate_tls_certificate")]
++    private extern bool generate_tls_certificate (string cert_path, string key_path, string common_name) throws GLib.Error;
++
++    [CCode (cname = "sharing_backend_generate_password")]
++    private extern string? generate_password ();
++
++    [DBus (name = "org.freedesktop.systemd1.Manager")]
++    private interface SystemdManager : Object {
++        public abstract async void enable_unit_files (string[] files, bool runtime, bool force, out bool carries_install_info, out UnitFileChange[] changes) throws Error;
++        public abstract async void disable_unit_files (string[] files, bool runtime, out UnitFileChange[] changes) throws Error;
++        public abstract async ObjectPath start_unit (string name, string mode) throws Error;
++        public abstract async ObjectPath stop_unit (string name, string mode) throws Error;
++    }
++
++    private struct UnitFileChange {
++        string type;
++        string filename;
++        string destination;
++    }
++
++    /*
++     * Configures the RDP server of GNOME Remote Desktop for the current user session.
++     *
++     * The daemon only serves RDP once it is enabled in GSettings, has a TLS
++     * certificate and key, and finds credentials in the keyring, so all three
++     * are set up here before the daemon is started.
++     */
++    public class RemoteDesktop : Object {
++        public const string RDP_SCHEMA = "org.gnome.desktop.remote-desktop.rdp";
++        private const string VNC_SCHEMA = "org.gnome.desktop.remote-desktop.vnc";
++        private const string SERVICE = "gnome-remote-desktop.service";
++
++        public Settings rdp_settings { get; private set; }
++
++        private Secret.Schema credentials_schema;
++
++        public static bool is_supported () {
++            return SettingsSchemaSource.get_default ().lookup (RDP_SCHEMA, true) != null;
++        }
++
++        construct {
++            rdp_settings = new Settings (RDP_SCHEMA);
++            // Must match the schema gnome-remote-desktop looks the credentials up with
++            credentials_schema = new Secret.Schema (
++                "org.gnome.RemoteDesktop.RdpCredentials", Secret.SchemaFlags.NONE,
++                "credentials", Secret.SchemaAttributeType.STRING
++            );
++        }
++
++        public async void get_credentials (out string? username, out string? password) throws Error {
++            username = null;
++            password = null;
++
++            var serialized = yield Secret.password_lookupv (credentials_schema, new HashTable<string, string> (str_hash, str_equal), null);
++            if (serialized == null) {
++                return;
++            }
++
++            var credentials = Variant.parse (new VariantType ("a{sv}"), serialized);
++            credentials.lookup ("username", "s", out username);
++            credentials.lookup ("password", "s", out password);
++        }
++
++        public async void set_credentials (string username, string password) throws Error {
++            var builder = new VariantBuilder (new VariantType ("a{sv}"));
++            builder.add ("{sv}", "username", new Variant.string (username));
++            builder.add ("{sv}", "password", new Variant.string (password));
++
++            yield Secret.password_storev (
++                credentials_schema,
++                new HashTable<string, string> (str_hash, str_equal),
++                Secret.COLLECTION_DEFAULT,
++                "GNOME Remote Desktop RDP credentials",
++                builder.end ().print (true),
++                null
++            );
++        }
++
++        public async void set_enabled (bool enabled) throws Error {
++            var systemd = yield Bus.get_proxy<SystemdManager> (BusType.SESSION, "org.freedesktop.systemd1", "/org/freedesktop/systemd1");
++
++            if (enabled) {
++                yield ensure_credentials ();
++                ensure_certificate ();
++                rdp_settings.set_boolean ("enable", true);
++
++                bool carries_install_info;
++                UnitFileChange[] changes;
++                yield systemd.enable_unit_files ({ SERVICE }, false, false, out carries_install_info, out changes);
++                yield systemd.start_unit (SERVICE, "replace");
++                return;
++            }
++
++            rdp_settings.set_boolean ("enable", false);
++
++            // The same daemon also serves VNC, leave it running if that is still in use
++            if (SettingsSchemaSource.get_default ().lookup (VNC_SCHEMA, true) != null && new Settings (VNC_SCHEMA).get_boolean ("enable")) {
++                return;
++            }
++
++            UnitFileChange[] changes;
++            yield systemd.disable_unit_files ({ SERVICE }, false, out changes);
++            yield systemd.stop_unit (SERVICE, "replace");
++        }
++
++        private async void ensure_credentials () throws Error {
++            string? username, password;
++            yield get_credentials (out username, out password);
++
++            if (username == null || username == "" || password == null || password == "") {
++                var generated_password = generate_password ();
++                if (generated_password == null) {
++                    throw new IOError.FAILED ("Failed to generate a password");
++                }
++
++                yield set_credentials (Environment.get_user_name (), generated_password);
++            }
++        }
++
++        private void ensure_certificate () throws Error {
++            var cert_path = rdp_settings.get_string ("tls-cert");
++            var key_path = rdp_settings.get_string ("tls-key");
++            if (cert_path != "" && key_path != "" && FileUtils.test (cert_path, EXISTS) && FileUtils.test (key_path, EXISTS)) {
++                return;
++            }
++
++            // Same location GNOME Settings uses, so both share one certificate
++            var dir = Path.build_filename (Environment.get_user_data_dir (), "gnome-remote-desktop");
++            DirUtils.create_with_parents (dir, 0700);
++
++            cert_path = Path.build_filename (dir, "rdp-tls.crt");
++            key_path = Path.build_filename (dir, "rdp-tls.key");
++            generate_tls_certificate (cert_path, key_path, "GNOME");
++
++            rdp_settings.set_string ("tls-cert", cert_path);
++            rdp_settings.set_string ("tls-key", key_path);
++        }
++    }
++}
+diff --git a/src/Plug.vala b/src/Plug.vala
+index 533c799..16215d5 100644
+--- a/src/Plug.vala
++++ b/src/Plug.vala
+@@ -64,6 +64,11 @@ public class Sharing.Plug : Switchboard.Plug {
+             settings_view.add_child (dlna_page);
+             settings_view.add_child (bluetooth_page);
+ 
++            // Only offered when GNOME Remote Desktop is installed
++            if (Backend.RemoteDesktop.is_supported ()) {
++                settings_view.add_child (new Widgets.RemoteDesktopPage ());
++            }
++
+             var sidebar = new Switchboard.SettingsSidebar (settings_view) {
+                 show_title_buttons = true
+             };
+@@ -109,6 +114,10 @@ public class Sharing.Plug : Switchboard.Plug {
+         search_results.set ("%s → %s".printf (display_name, _("Media Streaming")), "");
+         search_results.set ("%s → %s".printf (display_name, _("DLNA and UPnP")), "");
+         search_results.set ("%s → %s".printf (display_name, _("Bluetooth")), "");
++        if (Backend.RemoteDesktop.is_supported ()) {
++            search_results.set ("%s → %s".printf (display_name, _("Remote Desktop")), "");
++            search_results.set ("%s → %s".printf (display_name, _("RDP")), "");
++        }
+         return search_results;
+     }
+ 
+diff --git a/src/Widgets/RemoteDesktopPage.vala b/src/Widgets/RemoteDesktopPage.vala
+new file mode 100644
+index 0000000..4173f86
+--- /dev/null
++++ b/src/Widgets/RemoteDesktopPage.vala
+@@ -0,0 +1,211 @@
++/*
++ * SPDX-License-Identifier: GPL-2.0-or-later
++ * SPDX-FileCopyrightText: 2023-2026 elementary, Inc. (https://elementary.io)
++ */
++
++public class Sharing.Widgets.RemoteDesktopPage : Switchboard.SettingsPage {
++    private const uint DEFAULT_PORT = 3389;
++
++    private Backend.RemoteDesktop remote_desktop;
++    private Gtk.Label address_label;
++    private Gtk.Entry username_entry;
++    private Gtk.PasswordEntry password_entry;
++    private uint save_timeout_id = 0;
++    private bool syncing = false;
++    private string? error_message = null;
++
++    public RemoteDesktopPage () {
++        Object (activatable: true);
++    }
++
++    construct {
++        title = _("Remote Desktop");
++        icon = new ThemedIcon ("preferences-desktop-remote-desktop");
++        show_end_title_buttons = true;
++
++        remote_desktop = new Backend.RemoteDesktop ();
++
++        var address_header = new Granite.HeaderLabel (_("Address")) {
++            secondary_text = _("Connect to this computer from another device using a Remote Desktop (RDP) app.")
++        };
++
++        address_label = new Gtk.Label ("") {
++            halign = START,
++            selectable = true
++        };
++        address_label.add_css_class (Granite.STYLE_CLASS_H3_LABEL);
++
++        var control_switch = new Gtk.Switch () {
++            valign = CENTER
++        };
++
++        var control_label = new Gtk.Label (_("Allow connected devices to control this computer:")) {
++            halign = END,
++            mnemonic_widget = control_switch
++        };
++
++        var control_box = new Gtk.Box (HORIZONTAL, 12);
++        control_box.append (control_label);
++        control_box.append (control_switch);
++
++        var login_header = new Granite.HeaderLabel (_("Login")) {
++            secondary_text = _("Remote devices have to sign in with this user name and password.")
++        };
++
++        username_entry = new Gtk.Entry () {
++            hexpand = true
++        };
++
++        var username_label = new Gtk.Label (_("User name:")) {
++            halign = END,
++            mnemonic_widget = username_entry
++        };
++
++        password_entry = new Gtk.PasswordEntry () {
++            hexpand = true,
++            show_peek_icon = true
++        };
++
++        var password_label = new Gtk.Label (_("Password:")) {
++            halign = END,
++            mnemonic_widget = password_entry
++        };
++
++        var login_grid = new Gtk.Grid () {
++            column_spacing = 12,
++            row_spacing = 6
++        };
++        login_grid.attach (username_label, 0, 0);
++        login_grid.attach (username_entry, 1, 0);
++        login_grid.attach (password_label, 0, 1);
++        login_grid.attach (password_entry, 1, 1);
++
++        var address_box = new Gtk.Box (VERTICAL, 6);
++        address_box.append (address_header);
++        address_box.append (address_label);
++
++        var login_box = new Gtk.Box (VERTICAL, 6);
++        login_box.append (login_header);
++        login_box.append (login_grid);
++
++        var box = new Gtk.Box (VERTICAL, 24);
++        box.append (address_box);
++        box.append (control_box);
++        box.append (login_box);
++
++        child = box;
++
++        var settings = remote_desktop.rdp_settings;
++        settings.bind ("view-only", control_switch, "active", INVERT_BOOLEAN);
++        settings.changed["port"].connect (update_address);
++        settings.changed["enable"].connect (() => {
++            syncing = true;
++            status_switch.active = settings.get_boolean ("enable");
++            syncing = false;
++            set_service_state ();
++        });
++
++        status_switch.active = settings.get_boolean ("enable");
++        status_switch.notify["active"].connect (() => {
++            if (!syncing) {
++                set_enabled.begin (status_switch.active);
++            }
++        });
++
++        username_entry.changed.connect (queue_save_credentials);
++        password_entry.changed.connect (queue_save_credentials);
++
++        update_address ();
++        set_service_state ();
++        load_credentials.begin ();
++    }
++
++    private async void set_enabled (bool enabled) {
++        error_message = null;
++
++        try {
++            yield remote_desktop.set_enabled (enabled);
++        } catch (Error e) {
++            critical ("Unable to %s remote desktop: %s", enabled ? "enable" : "disable", e.message);
++            error_message = e.message;
++
++            syncing = true;
++            status_switch.active = remote_desktop.rdp_settings.get_boolean ("enable");
++            syncing = false;
++        }
++
++        set_service_state ();
++
++        // Credentials are generated the first time remote desktop is enabled
++        if (enabled) {
++            yield load_credentials ();
++        }
++    }
++
++    private async void load_credentials () {
++        string? username, password;
++        try {
++            yield remote_desktop.get_credentials (out username, out password);
++        } catch (Error e) {
++            warning ("Unable to read remote desktop credentials: %s", e.message);
++            return;
++        }
++
++        syncing = true;
++        username_entry.text = username ?? "";
++        password_entry.text = password ?? "";
++        syncing = false;
++    }
++
++    private void queue_save_credentials () {
++        if (syncing) {
++            return;
++        }
++
++        if (save_timeout_id != 0) {
++            Source.remove (save_timeout_id);
++        }
++
++        save_timeout_id = Timeout.add (500, () => {
++            save_timeout_id = 0;
++
++            if (username_entry.text != "" && password_entry.text != "") {
++                remote_desktop.set_credentials.begin (username_entry.text, password_entry.text, (obj, res) => {
++                    try {
++                        remote_desktop.set_credentials.end (res);
++                    } catch (Error e) {
++                        critical ("Unable to save remote desktop credentials: %s", e.message);
++                    }
++                });
++            }
++
++            return Source.REMOVE;
++        });
++    }
++
++    private void update_address () {
++        var port = remote_desktop.rdp_settings.get_value ("port").get_uint16 ();
++        var address = "rdp://%s".printf (Environment.get_host_name ());
++        if (port != DEFAULT_PORT) {
++            address += ":%u".printf (port);
++        }
++
++        address_label.label = address;
++    }
++
++    private void set_service_state () {
++        if (error_message != null) {
++            description = _("Remote Desktop settings could not be changed: %s").printf (error_message);
++            status = _("Not Available");
++            status_type = ERROR;
++        } else if (remote_desktop.rdp_settings.get_boolean ("enable")) {
++            description = _("While enabled, other devices can see this computer's screen and, if allowed, control it after signing in.");
++            status = _("Enabled");
++            status_type = SUCCESS;
++        } else {
++            description = _("While disabled, this computer's screen can not be viewed or controlled from other devices.");
++            status = _("Disabled");
++            status_type = OFFLINE;
++        }
++    }
++}
+diff --git a/src/meson.build b/src/meson.build
+index e3d44bd..1eea705 100644
+--- a/src/meson.build
++++ b/src/meson.build
+@@ -2,9 +2,12 @@ plug_files = files(
+     'Plug.vala',
+     'Widgets/DLNAPage.vala',
+     'Widgets/BluetoothPage.vala',
++    'Widgets/RemoteDesktopPage.vala',
+     'Backend/RygelStartupManager.vala',
+     'Backend/RygelConfigFile.vala',
+-    'Backend/SharingDBusInterface.vala'
++    'Backend/SharingDBusInterface.vala',
++    'Backend/RemoteDesktop.vala',
++    'Backend/Gnutls.c'
+ )
+ 
+ switchboard_dep = dependency('switchboard-3')
+@@ -21,6 +24,8 @@ shared_module(
+         dependency('granite-7'),
+         dependency('gtk4', version: '>=4.10'),
+         dependency('libadwaita-1', version: '>=1.4'),
++        dependency('libsecret-1'),
++        dependency('gnutls'),
+         switchboard_dep
+     ],
+     install: true,
+-- 
+2.56.0
+

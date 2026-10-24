@@ -23,9 +23,20 @@ stdenv.mkDerivation rec {
   src = fetchFromGitHub {
     owner = "elementary";
     repo = "videos";
-    rev = version;
+    tag = version;
     hash = "sha256-a6KV3F/18CkAc810WhZUvu/5wLi3bhi/Y8MBSwah5eU=";
   };
+
+  patches = [
+    # Closing the nested audio/subtitle combobox popup drops the settings
+    # popover's autohide grab (GTK < 4.24), so it no longer closes on outside
+    # clicks; close the popover with it like switchboard-plug-display does.
+    ./fix-settings-popover-autohide.patch
+    # Escape quit the app (Ctrl+Q already does) and, being handled on key
+    # release, also fired after closing a popover or clearing the search entry.
+    # Escape now leaves fullscreen, or otherwise goes back to the library.
+    ./fix-escape-closing-popovers-quitting.patch
+  ];
 
   nativeBuildInputs = [
     meson

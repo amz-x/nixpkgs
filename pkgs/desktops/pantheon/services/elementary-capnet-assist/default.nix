@@ -23,7 +23,7 @@ stdenv.mkDerivation rec {
   src = fetchFromGitHub {
     owner = "elementary";
     repo = "capnet-assist";
-    rev = version;
+    tag = version;
     hash = "sha256-IEitFJnQECEkT8eafPZ+9hPQuWoTbqfsoUh1zUfOHYM=";
   };
 

@@ -16,15 +16,15 @@
   wrapGAppsHook4,
 }:
 
-stdenv.mkDerivation rec {
+stdenv.mkDerivation {
   pname = "elementary-notifications";
-  version = "8.1.2";
+  version = "8.1.2-unstable-2026-09-11"; # nixpkgs-update: no auto update
 
   src = fetchFromGitHub {
     owner = "elementary";
     repo = "notifications";
-    tag = version;
-    hash = "sha256-qod76RSsCO9NvjnYTLRW6P1UyR1K6Uu9fEjU2WgHUWk=";
+    rev = "9577e3a225c7dbb7053c6c608beda92bf66fa255";
+    hash = "sha256-wUaK8pWq+EN7E4w80/Azlq8qEA1gRLi2jKn9t9zlJWo=";
   };
 
   strictDeps = true;

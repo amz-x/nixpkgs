@@ -10,8 +10,11 @@
   elementary-bluetooth-daemon,
   libgee,
   gettext,
+  gnutls,
   granite7,
   gtk4,
+  libadwaita,
+  libsecret,
   switchboard,
 }:
 
@@ -26,6 +29,12 @@ stdenv.mkDerivation rec {
     hash = "sha256-TNLnSFvjJFUfDkhYSKgqgpmpZggIw3LcBqmkXIzZ3nk=";
   };
 
+  patches = [
+    # Remote Desktop page backed by gnome-remote-desktop (RDP), a port of
+    # https://github.com/elementary/settings-sharing/pull/60
+    ./remote-desktop.patch
+  ];
+
   nativeBuildInputs = [
     gettext # msgfmt
     meson
@@ -36,9 +45,12 @@ stdenv.mkDerivation rec {
 
   buildInputs = [
     elementary-bluetooth-daemon
+    gnutls
     granite7
     gtk4
+    libadwaita
     libgee
+    libsecret
     switchboard
   ];
 

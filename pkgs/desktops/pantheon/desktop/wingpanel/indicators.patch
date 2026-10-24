@@ -1,10 +1,10 @@
-diff --git a/lib/IndicatorManager.vala b/lib/IndicatorManager.vala
-index a99a1ec..0ae7799 100644
---- a/lib/IndicatorManager.vala
-+++ b/lib/IndicatorManager.vala
-@@ -115,7 +115,15 @@ public class Wingpanel.IndicatorManager : GLib.Object {
-         }
- 
+diff --git a/src/Services/IndicatorManager.vala b/src/Services/IndicatorManager.vala
+index ac25b5c..de48679 100644
+--- a/src/Services/IndicatorManager.vala
++++ b/src/Services/IndicatorManager.vala
+@@ -58,7 +58,15 @@ public class Wingpanel.IndicatorManager : GLib.Object {
+         this.server_type = server_type;
+
          /* load indicators */
 -        var base_folder = File.new_for_path (Build.INDICATORS_DIR);
 +
@@ -16,6 +16,6 @@ index a99a1ec..0ae7799 100644
 +        }
 +
 +        var base_folder = File.new_for_path (indicators_path);
- 
+
          try {
              monitor = base_folder.monitor_directory (FileMonitorFlags.NONE, null);

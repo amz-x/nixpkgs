@@ -88,6 +88,14 @@ stdenv.mkDerivation (finalAttrs: {
       hash = "sha256-NpASGgEhOjxuKME2f7RM2U5JvRRdl0OF5lHnp5aKxxk=";
     })
 
+    # Fix tty for Wayland sessions: use /dev/ttyN and set PAM_TTY to the session VT,
+    # otherwise logind rejects the session with InvalidParameter.
+    # https://github.com/ubuntu/lightdm/pull/483
+    (fetchpatch {
+      url = "https://github.com/ubuntu/lightdm/commit/14f63379d3d35b914cc160a2637866baa4c04429.patch";
+      hash = "sha256-tgegVnAXtGnETyMjQQgB1bYTacOaQltvcjwiYcgse2k=";
+    })
+
     # Hardcode plymouth to fix transitions.
     # For some reason it can't find `plymouth`
     # even when it's in PATH in environment.systemPackages.

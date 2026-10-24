@@ -1,39 +1,75 @@
 {
-  lib,
-  stdenv,
-  fetchFromGitHub,
-  nix-update-script,
-  wayland-scanner,
-  wrapGAppsHook3,
-  pkg-config,
-  meson,
-  ninja,
-  vala,
-  gala,
-  glib,
-  gtk3,
-  libgee,
-  granite,
-  gettext,
-  mutter,
-  wayland,
-  json-glib,
+  atk,
+  colord,
+  egl-wayland,
   elementary-gtk-theme,
   elementary-icon-theme,
+  fetchFromGitHub,
+  fribidi,
+  gala,
+  gettext,
+  glib,
+  gnome-desktop,
+  gnome-settings-daemon,
+  gobject-introspection,
+  granite7,
+  gtk4,
+  harfbuzz,
+  json-glib,
+  lcms2,
+  lib,
+  libcanberra,
+  libdisplay-info,
+  libdrm,
+  libei,
+  libgbm,
+  libgee,
+  libGL,
+  libgudev,
+  libinput,
+  libstartup_notification,
+  libsysprof-capture,
+  libwacom,
+  libx11,
+  libxau,
+  libxcb,
+  libxcomposite,
+  libxcursor,
+  libxdamage,
+  libxext,
+  libxfixes,
+  libxi,
+  libxinerama,
+  libxkbcommon,
+  libxrandr,
+  meson,
+  mutter,
+  ninja,
+  nix-update-script,
+  pipewire,
+  pixman,
+  pkg-config,
+  stdenv,
+  systemd,
+  vala,
+  wayland-scanner,
+  wayland,
+  wrapGAppsHook4,
 }:
 
-stdenv.mkDerivation rec {
+stdenv.mkDerivation {
   pname = "wingpanel";
-  version = "8.0.4";
+  version = "8.0.4-unstable-2026-10-14"; # nixpkgs-update: no auto update
 
   src = fetchFromGitHub {
     owner = "elementary";
     repo = "wingpanel";
-    tag = version;
-    hash = "sha256-+m1TydQtbXuA7uS6hZVC8z6JgOUxDh/QXL/4tROHhwk=";
+    rev = "e737de88bc02ddc82a9f4d23f574cc3c04098c03";
+    hash = "sha256-TJ1G1ES2GIpJZixRNT9U0/IEhh+ajPmPm/0terlY2VM=";
   };
 
   patches = [
+    # Wingpanel indicators patch for NixOS
     ./indicators.patch
   ];
 
@@ -48,22 +84,57 @@ stdenv.mkDerivation rec {
     pkg-config
     vala
     wayland-scanner
-    wrapGAppsHook3
+    wrapGAppsHook4
   ];
 
   buildInputs = [
+    atk
+    colord
+    egl-wayland
     elementary-icon-theme
+    fribidi
     gala
-    granite
+    gnome-desktop
+    gnome-settings-daemon
+    gobject-introspection
+    granite7
+    harfbuzz
     json-glib
+    lcms2
+    libcanberra
+    libdisplay-info
+    libdrm
+    libei
+    libgbm
     libgee
+    libGL
+    libgudev
+    libinput
+    libstartup_notification
+    libsysprof-capture
+    libwacom
+    libx11
+    libxau
+    libxcb
+    libxcomposite
+    libxcursor
+    libxdamage
+    libxext
+    libxfixes
+    libxi
+    libxinerama
+    libxkbcommon
+    libxrandr
     mutter
+    pipewire
+    pixman
+    systemd
     wayland
   ];
 
   propagatedBuildInputs = [
     glib
-    gtk3
+    gtk4
   ];
 
   preFixup = ''

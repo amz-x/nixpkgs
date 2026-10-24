@@ -25,9 +25,9 @@
   systemdLibs,
 }:
 
-stdenv.mkDerivation rec {
+stdenv.mkDerivation {
   pname = "elementary-files";
-  version = "7.3.3";
+  version = "7.3.3-unstable-2026-10-14"; # nixpkgs-update: no auto update
 
   outputs = [
     "out"
@@ -37,9 +37,24 @@ stdenv.mkDerivation rec {
   src = fetchFromGitHub {
     owner = "elementary";
     repo = "files";
-    rev = version;
-    hash = "sha256-Na5aiIgdAogSRwysz4v6U47tphVYVWleJ6OokXT+HMw=";
+    rev = "defe6e64c6d50a9f7069680ece7ca720c6735409";
+    hash = "sha256-0sJJe7EjcYTg0U9nYqF9z6TVqCuhrXC9Tq3fFWhe0xg=";
   };
+
+  patches = [
+    # Launching apps with a null GAppLaunchContext gives them no XDG
+    # activation token, so e.g. "Open in > Terminal" didn't focus Terminal.
+    ./launch-context-activation-token.patch
+  ];
+
+  postPatch = ''
+    # pkexec's sanitized environment doesn't set $SHELL itself, so it
+    # falls through to whatever the invoking user's login shell is
+    # (fish, nu, ...) -- which the root-privileged files helper isn't
+    # prepared to run commands with. Force a POSIX shell instead.
+    substituteInPlace data/io.elementary.files-pkexec.in \
+      --replace-fail 'pkexec "@exec_name@"' 'SHELL=/bin/sh pkexec "@exec_name@"'
+  '';
 
   nativeBuildInputs = [
     desktop-file-utils
