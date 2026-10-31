@@ -1,0 +1,117 @@
+diff --git a/src/Indicator.vala b/src/Indicator.vala
+index e2c8e102..cfa3de07 100644
+--- a/src/Indicator.vala
++++ b/src/Indicator.vala
+@@ -54,10 +54,8 @@ public class Power.Indicator : Wingpanel.Indicator {
+         if (display_widget == null) {
+             display_widget = new Widgets.DisplayWidget ();
+ 
+-            /* No need to display the indicator when the device is completely in AC mode */
+-            if (dm.has_battery || brightness_manager.has_monitors) {
+-                update_visibility ();
+-            }
++            /* Always display the indicator so power profiles can be toggled */
++            update_visibility ();
+ 
+             setup_scroll_controller ();
+             dm.notify["has-battery"].connect (update_visibility);
+@@ -86,7 +84,7 @@ public class Power.Indicator : Wingpanel.Indicator {
+     private void update_visibility () {
+         var dm = Services.DeviceManager.get_default ();
+ 
+-        bool should_be_visible = (dm.has_battery || brightness_manager.has_monitors);
++        bool should_be_visible = true;
+         if (visible != should_be_visible) {
+             /* NOTE: popover closes every time you set visibility, so change property only when needed */
+             visible = should_be_visible;
+@@ -95,8 +93,10 @@ public class Power.Indicator : Wingpanel.Indicator {
+         if (visible) {
+             if (dm.has_battery) {
+                 update_display_device ();
+-            } else {
++            } else if (brightness_manager.has_monitors) {
+                 show_backlight_data ();
++            } else {
++                show_power_mode_data ();
+             }
+         }
+ 
+@@ -143,6 +143,13 @@ public class Power.Indicator : Wingpanel.Indicator {
+         }
+     }
+ 
++    private void show_power_mode_data () {
++        if (display_widget != null) {
++            display_widget.icon_name = "power-mode-balanced-symbolic";
++            display_widget.allow_percent = false;
++        }
++    }
++
+     private void update_tooltip () {
+         string? primary_text = null;
+         string? secondary_text = null;
+@@ -171,7 +178,7 @@ public class Power.Indicator : Wingpanel.Indicator {
+         }
+ 
+         if (primary_text == null) {
+-            display_widget.tooltip_markup = null;
++            display_widget.tooltip_markup = _("Power Mode");
+         } else if (secondary_text == null) {
+             display_widget.tooltip_markup = primary_text;
+         } else {
+diff --git a/src/Widgets/PopoverWidget.vala b/src/Widgets/PopoverWidget.vala
+index ea05a1b2..edbc0f40 100644
+--- a/src/Widgets/PopoverWidget.vala
++++ b/src/Widgets/PopoverWidget.vala
+@@ -26,6 +26,8 @@ public class Power.Widgets.PopoverWidget : Gtk.Box {
+     private Gtk.Revealer device_separator_revealer;
+ 
+     private PowerModeList power_mode_list;
++    private Gtk.Separator power_mode_separator;
++    private Granite.HeaderLabel power_mode_header;
+ 
+     public PopoverWidget (bool is_in_session) {
+         Object (is_in_session: is_in_session);
+@@ -82,11 +84,15 @@ public class Power.Widgets.PopoverWidget : Gtk.Box {
+ 
+         power_mode_list = new PowerModeList ();
+ 
+-        var power_mode_separator = new Gtk.Separator (Gtk.Orientation.HORIZONTAL) {
++        power_mode_separator = new Gtk.Separator (Gtk.Orientation.HORIZONTAL) {
+             margin_top = 3,
+             margin_bottom = 3
+         };
+ 
++        power_mode_header = new Granite.HeaderLabel (_("Power Mode")) {
++            mnemonic_widget = power_mode_list
++        };
++
+         var show_settings_button = new Wingpanel.PopoverMenuItem () {
+             margin_bottom = 3,
+             text = _("Power Settings…")
+@@ -103,7 +109,12 @@ public class Power.Widgets.PopoverWidget : Gtk.Box {
+         }
+ 
+         if (PowerModeList.successfully_initialized) {
++            update_power_mode_separator ();
++            dm.notify["has-battery"].connect (update_power_mode_separator);
++            brightness_manager.notify["has-monitors"].connect (update_power_mode_separator);
++
+             append (power_mode_separator);
++            append (power_mode_header);
+             append (power_mode_list);
+         }
+ 
+@@ -139,6 +150,12 @@ public class Power.Widgets.PopoverWidget : Gtk.Box {
+         });
+     }
+ 
++    private void update_power_mode_separator () {
++        power_mode_separator.visible = brightness_manager.has_monitors || dm.has_battery;
++        /* Only label the power modes when they are the only thing in the popover */
++        power_mode_header.visible = !power_mode_separator.visible;
++    }
++
+     private void update_device_separator_revealer () {
+         device_separator_revealer.reveal_child = brightness_manager.has_monitors && dm.has_battery;
+     }

@@ -19,13 +19,13 @@
 
 stdenv.mkDerivation rec {
   pname = "switchboard-plug-sound";
-  version = "8.0.3";
+  version = "8.0.3-unstable-2026-10-27"; # nixpkgs-update: no auto update
 
   src = fetchFromGitHub {
     owner = "elementary";
     repo = "settings-sound";
-    tag = version;
-    hash = "sha256-jiaxb8aQuGrPcIaR28L2i2J3z4eL+OdrbCJ/abuXvuY=";
+    rev = "484ee80b3c79e5522bc54b13d378520243e2fbef";
+    hash = "sha256-x1/D5n+BYxvZIR7Tt22jvqFT0FgO8ivPC4JyJTF+LI0=";
   };
 
   nativeBuildInputs = [

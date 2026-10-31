@@ -18,13 +18,13 @@
 
 stdenv.mkDerivation rec {
   pname = "pantheon-agent-geoclue2";
-  version = "1.0.6";
+  version = "1.0.6-unstable-2023-04-11"; # nixpkgs-update: no auto update
 
   src = fetchFromGitHub {
     owner = "elementary";
     repo = "pantheon-agent-geoclue2";
-    rev = version;
-    hash = "sha256-DvE0/bR4mVfqCw/c/1h75M8DfCiNPZ2h6Jl6ySk1qxs=";
+    rev = "aab98c3f44dc912815755d249bd341a822426c73";
+    hash = "sha256-Gm4T1fMii7d6wUN1rs3SoMtiwHbc8EuzmhP4LNU4nNc=";
   };
 
   nativeBuildInputs = [

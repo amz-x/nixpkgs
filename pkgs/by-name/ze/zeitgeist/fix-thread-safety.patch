@@ -1,0 +1,105 @@
+diff --git a/libzeitgeist/event.vala b/libzeitgeist/event.vala
+index 0cd708c..33fcf8d 100644
+--- a/libzeitgeist/event.vala
++++ b/libzeitgeist/event.vala
+@@ -114,7 +114,18 @@ public class Event : Object
+ {
+     public const string SIGNATURE = "asaasay";
+ 
++    // Shared by every thread that builds events (Log runs direct DB reads
++    // on a thread pool), but GStringChunk is not thread-safe.
+     private static StringChunk url_store;
++    private static Mutex url_store_lock;
++
++    private static unowned string intern (string value)
++    {
++        url_store_lock.lock ();
++        unowned string result = url_store.insert_const (value);
++        url_store_lock.unlock ();
++        return result;
++    }
+ 
+     public uint32  id { get; set; }
+     public int64   timestamp { get; set; }
+@@ -123,17 +134,17 @@ public class Event : Object
+     public string? actor
+     {
+         get { return _actor; }
+-        set { _actor = (value != null) ? url_store.insert_const (value) : null; }
++        set { _actor = (value != null) ? intern (value) : null; }
+     }
+     public string? interpretation
+     {
+         get { return _interpretation; }
+-        set { _interpretation = (value != null) ? url_store.insert_const (value) : null; }
++        set { _interpretation = (value != null) ? intern (value) : null; }
+     }
+     public string? manifestation
+     {
+         get { return _manifestation; }
+-        set { _manifestation = (value != null) ? url_store.insert_const (value) : null; }
++        set { _manifestation = (value != null) ? intern (value) : null; }
+     }
+ 
+     private unowned string? _actor;
+diff --git a/libzeitgeist/log.vala b/libzeitgeist/log.vala
+index 53cd4f5..62454e8 100644
+--- a/libzeitgeist/log.vala
++++ b/libzeitgeist/log.vala
+@@ -141,9 +141,11 @@ public class Log : QueuedProxyWrapper
+         warn_if_fail (engine_version.get_type_string () == "(iii)");
+ 
+         try {
++            // All workers share one DbReader, whose SQLite statements and
++            // lookup caches are not thread-safe, so run them one at a time.
+             threads = new ThreadPool<DbWorker>.with_owned_data ((worker) => {
+                 worker.run ();
+-            }, (int) get_num_processors (), true);
++            }, 1, true);
+         } catch (ThreadError err) {
+             warning ("%s", err.message);
+             threads = null;
+diff --git a/libzeitgeist/subject.vala b/libzeitgeist/subject.vala
+index 3e425d3..1819b3a 100644
+--- a/libzeitgeist/subject.vala
++++ b/libzeitgeist/subject.vala
+@@ -37,7 +37,18 @@ namespace Zeitgeist
+  */
+ public class Subject : Object
+ {
++    // Shared by every thread that builds events (Log runs direct DB reads
++    // on a thread pool), but GStringChunk is not thread-safe.
+     private static StringChunk url_store;
++    private static Mutex url_store_lock;
++
++    private static unowned string intern (string value)
++    {
++        url_store_lock.lock ();
++        unowned string result = url_store.insert_const (value);
++        url_store_lock.unlock ();
++        return result;
++    }
+ 
+     public string? uri { get; set; }
+     public string? origin { get; set; }
+@@ -51,17 +62,17 @@ public class Subject : Object
+     public string? mimetype
+     {
+         get { return _mimetype; }
+-        set { _mimetype = (value != null) ? url_store.insert_const (value) : null; }
++        set { _mimetype = (value != null) ? intern (value) : null; }
+     }
+     public string? interpretation
+     {
+         get { return _interpretation; }
+-        set { _interpretation = (value != null) ? url_store.insert_const (value) : null; }
++        set { _interpretation = (value != null) ? intern (value) : null; }
+     }
+     public string? manifestation
+     {
+         get { return _manifestation; }
+-        set { _manifestation = (value != null) ? url_store.insert_const (value) : null; }
++        set { _manifestation = (value != null) ? intern (value) : null; }
+     }
+ 
+     private unowned string? _mimetype;

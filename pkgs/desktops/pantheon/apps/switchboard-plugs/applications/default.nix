@@ -16,15 +16,15 @@
   flatpak,
 }:
 
-stdenv.mkDerivation rec {
+stdenv.mkDerivation {
   pname = "switchboard-plug-applications";
-  version = "8.3.0";
+  version = "8.3.0-unstable-2026-10-11"; # nixpkgs-update: no auto update
 
   src = fetchFromGitHub {
     owner = "elementary";
     repo = "settings-applications";
-    tag = version;
-    hash = "sha256-2sa6D+vOQidFwBBiqFioOocN//3A3RLKX7w0U62K4oI=";
+    rev = "d4adbbbf51a8bf8b082585446d8ae11928accc04";
+    hash = "sha256-0rZVCbUJbl56t67CmJ52/EZqSBnuih6+5JyCAHnezwo=";
   };
 
   nativeBuildInputs = [

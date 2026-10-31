@@ -14,13 +14,13 @@
 
 stdenv.mkDerivation (finalAttrs: {
   pname = "live-chart";
-  version = "2.0.0";
+  version = "2.0.0-unstable-2026-09-23"; # nixpkgs-update: no auto update
 
   src = fetchFromGitHub {
     owner = "elementary";
     repo = "live-chart";
-    tag = finalAttrs.version;
-    hash = "sha256-X/wdmKw381Fkjcvj7k2AmA/nXWKFFNx5KDNxeWEiqzs=";
+    rev = "7fd3950fbffa7ea575744dc955aeac1e915fa229";
+    hash = "sha256-WaHT6T68pfPylfjNc8RPRgFJHfv2nhe1g6Vv++2L5ec=";
   };
 
   outputs = [

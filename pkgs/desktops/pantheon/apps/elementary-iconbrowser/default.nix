@@ -16,15 +16,15 @@
   gtksourceview5,
 }:
 
-stdenv.mkDerivation rec {
+stdenv.mkDerivation {
   pname = "elementary-iconbrowser";
-  version = "8.1.0";
+  version = "8.1.0-unstable-2026-10-12"; # nixpkgs-update: no auto update
 
   src = fetchFromGitHub {
     owner = "elementary";
     repo = "iconbrowser";
-    rev = version;
-    hash = "sha256-o73RtSkhH1s4dtIvPPuy+CSLChIPAkkXy5bQ8LloitQ=";
+    rev = "f5d8c04913fbd7085ecf26accce76b498e260e82";
+    hash = "sha256-Jgu/TNOi8/QDrOb8CoNeVvQfo4YNXup/lbxreYItc50=";
   };
 
   nativeBuildInputs = [

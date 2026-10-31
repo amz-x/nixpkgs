@@ -1,0 +1,82 @@
+--- a/src/AppSystem/App.vala
++++ b/src/AppSystem/App.vala
+@@ -8,6 +8,7 @@
+     public const string ACTION_PREFIX = ACTION_GROUP_PREFIX + ".";
+     public const string UNINSTALL_ACTION = "uninstall";
+     public const string VIEW_ACTION = "view-in-appcenter";
++    public const string CLOSE_WINDOWS_ACTION = "close-windows";
+ 
+     private const string SWITCHEROO_ACTION = "switcheroo";
+     private const string APP_ACTION = "action.%s";
+@@ -56,6 +57,7 @@
+     private static Dock.SwitcherooControl switcheroo_control;
+     private GLib.SimpleAction uninstall_action;
+     private GLib.SimpleAction view_action;
++    private GLib.SimpleAction close_windows_action;
+ 
+     private string appstream_comp_id = "";
+ 
+@@ -123,6 +125,12 @@
+             on_appcenter_dbus_changed.begin ();
+         }
+ 
++        close_windows_action = new SimpleAction (CLOSE_WINDOWS_ACTION, null);
++        close_windows_action.set_enabled (false);
++        close_windows_action.activate.connect (close_windows);
++        app_action_group.add_action (close_windows_action);
++        notify["running"].connect (update_close_windows_action);
++
+         notify["pinned"].connect (() => {
+             check_remove ();
+         });
+@@ -187,6 +195,27 @@
+         return false;
+     }
+ 
++    private void update_close_windows_action () {
++        close_windows_action.set_enabled (running);
++    }
++
++    private void close_windows () {
++        unowned var desktop_integration = WindowSystem.get_default ().desktop_integration;
++        if (desktop_integration == null) {
++            return;
++        }
++
++        foreach (var win in windows) {
++            desktop_integration.close_window.begin (win.uid, (obj, res) => {
++                try {
++                    ((DesktopIntegration) obj).close_window.end (res);
++                } catch (Error e) {
++                    warning ("Failed to close window: %s", e.message);
++                }
++            });
++        }
++    }
++
+     private void check_remove () {
+         if (!pinned && !running) {
+             removed ();
+--- a/src/AppSystem/Launcher.vala
++++ b/src/AppSystem/Launcher.vala
+@@ -78,6 +78,10 @@
+         var shell_section = new Menu ();
+         shell_section.append (_("Keep in Dock"), ACTION_PREFIX + PINNED_ACTION);
+ 
++        var close_windows_item = new GLib.MenuItem (_("Close All Windows"), App.ACTION_PREFIX + App.CLOSE_WINDOWS_ACTION);
++        close_windows_item.set_attribute ("hidden-when", "s", "action-disabled");
++        shell_section.append_item (close_windows_item);
++
+         if (Environment.find_program_in_path ("io.elementary.appcenter") != null) {
+             shell_section.append (_("Uninstall"), App.ACTION_PREFIX + App.UNINSTALL_ACTION);
+             shell_section.append (_("View in AppCenter"), App.ACTION_PREFIX + App.VIEW_ACTION);
+--- a/src/WindowSystem/DesktopIntegration.vala
++++ b/src/WindowSystem/DesktopIntegration.vala
+@@ -27,6 +27,7 @@
+     public abstract async Window[] get_windows () throws GLib.DBusError, GLib.IOError;
+     public abstract async void show_windows_for (string app_id) throws GLib.DBusError, GLib.IOError;
+     public abstract async void focus_window (uint64 uid) throws GLib.DBusError, GLib.IOError;
++    public abstract async void close_window (uint64 uid) throws GLib.DBusError, GLib.IOError;
+     public abstract async void move_window_to_workspace (uint64 window, int workspace) throws GLib.DBusError, GLib.IOError;
+     public abstract async void activate_workspace (int index) throws GLib.DBusError, GLib.IOError;
+     public abstract async int get_n_workspaces () throws GLib.DBusError, GLib.IOError;

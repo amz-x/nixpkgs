@@ -19,13 +19,13 @@
 
 stdenv.mkDerivation rec {
   pname = "elementary-music";
-  version = "9.0.0";
+  version = "9.0.0-unstable-2026-10-14"; # nixpkgs-update: no auto update
 
   src = fetchFromGitHub {
     owner = "elementary";
     repo = "music";
-    rev = version;
-    hash = "sha256-q8FPylLh4B4k9Sr8CFaismJU9SfPZaS19ANLC3SBsE8=";
+    rev = "f87b485255f4a301b76a215015fb2a5208a3657a";
+    sha256 = "sha256-bSrLbsruKW67Xi0Aq5f3tFkl6sHB21YgVsJ3+tSBh04=";
   };
 
   nativeBuildInputs = [

@@ -2,7 +2,6 @@
   stdenv,
   lib,
   fetchFromGitHub,
-  fetchpatch,
   gettext,
   gtk4,
   meson,
@@ -27,27 +26,16 @@
 
 stdenv.mkDerivation (finalAttrs: {
   pname = "switchboard-plug-parental-controls";
-  version = "8.0.1";
+  version = "8.0.1-unstable-2026-10-24"; # nixpkgs-update: no auto update
 
   src = fetchFromGitHub {
     owner = "elementary";
     repo = "switchboard-plug-parental-controls";
-    tag = finalAttrs.version;
-    hash = "sha256-yxQZSbbtWP0+gMu4cZt4bKZC7z8iZILAILYnn9ExnJY=";
+    rev = "6f800d8db5b492648038e292cd292601c1a56dc7";
+    hash = "sha256-FHj2DspNr90AL5qWTVbALMmRg5gvkdrB5+/U8Ienmik=";
   };
 
   patches = [
-    # Change default config file path and separate default and run-time config file
-    # https://github.com/elementary/switchboard-plug-parental-controls/pull/206
-    (fetchpatch {
-      url = "https://github.com/elementary/switchboard-plug-parental-controls/commit/1e5a08c1c3b0a5503e9d3f6858047d53ed8188f7.patch";
-      hash = "sha256-daP/nBmrUw8b3UytIZz3bKdM+lIgAIQ/DJP0h9sdXmc=";
-    })
-    (fetchpatch {
-      url = "https://github.com/elementary/switchboard-plug-parental-controls/commit/51f027657616a5d4a6bd24478a5b94fad12edb95.patch";
-      hash = "sha256-JOogF1ychF7MAJdrKT4eiUgM8+Y7CN9nxnRNidRoMOk=";
-    })
-
     # See the nixos/lightdm module for corresponding PAM files.
     # Since we override conffile path we need to create time.conf ourselves.
     ./create-pam-time-conf.patch
@@ -84,7 +72,8 @@ stdenv.mkDerivation (finalAttrs: {
   mesonFlags = [
     # For /var/lib/pantheon-parental-controls/daemon.conf
     "-Dsharedstatedir=/var/lib"
-    "-Dsystemdunitdir=${placeholder "out"}/etc/systemd/system"
+    "-Dsystemdsystemunitdir=${placeholder "out"}/etc/systemd/system"
+    "-Dsystemduserunitdir=${placeholder "out"}/share/systemd/user"
   ];
 
   preFixup = ''

@@ -1548,6 +1548,7 @@ in
   };
   prosody = runTest ./xmpp/prosody.nix;
   prosody-mysql = handleTest ./xmpp/prosody-mysql.nix { };
+  proton-vpn = runTest ./proton-vpn.nix;
   prowlarr = runTest ./prowlarr.nix;
   proxy = runTest ./proxy.nix;
   pt2-clone = runTest ./pt2-clone.nix;

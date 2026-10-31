@@ -19,13 +19,13 @@
 
 stdenv.mkDerivation (finalAttrs: {
   pname = "elementary-maps";
-  version = "9.0.0";
+  version = "9.0.0-unstable-2026-10-22"; # nixpkgs-update: no auto update
 
   src = fetchFromGitHub {
     owner = "elementary";
     repo = "maps";
-    rev = finalAttrs.version;
-    hash = "sha256-ZXJp6LoR7+3v6Gqs2y04M/+UJN2CTpijHnJozd4fAls=";
+    rev = "04bf3bc67eb050bc95632961b23b2cbad43ae4f2";
+    hash = "sha256-8qxoaAvFfAMe9sCX9z80hNY02V3joIG7ELWSFvXuLpY=";
   };
 
   strictDeps = true;

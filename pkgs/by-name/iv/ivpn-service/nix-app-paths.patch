@@ -1,0 +1,153 @@
+--- a/daemon/oshelpers/linux/applist/applist.go
++++ b/daemon/oshelpers/linux/applist/applist.go
+@@ -30,11 +30,61 @@
+ 	"fmt"
+ 	"os"
+ 	"os/exec"
++	"os/user"
+ 	"path"
++	"path/filepath"
+ 	"regexp"
+ 	"strings"
++	"syscall"
+ )
+ 
++// LookPath resolves a binary like exec.LookPath, then falls back to the NixOS
++// profile directories. The daemon runs as a systemd service whose PATH does not
++// contain them, while desktop entries usually refer to binaries by name only.
++// When `home` is known only the profiles of the user owning it are searched,
++// otherwise the profiles of all users are.
++func LookPath(file string, home string) (string, error) {
++	ret, err := exec.LookPath(file)
++	if err == nil || strings.Contains(file, "/") {
++		return ret, err
++	}
++
++	dirs := []string{"/run/current-system/sw/bin"}
++	if len(home) > 0 {
++		if fi, statErr := os.Stat(home); statErr == nil {
++			if st, ok := fi.Sys().(*syscall.Stat_t); ok {
++				if u, uErr := user.LookupId(fmt.Sprint(st.Uid)); uErr == nil {
++					dirs = append(dirs, path.Join("/etc/profiles/per-user", u.Username, "bin"))
++				}
++			}
++		}
++		dirs = append(dirs,
++			path.Join(home, ".nix-profile", "bin"),
++			path.Join(home, ".local", "state", "nix", "profile", "bin"),
++			path.Join(home, ".local", "share", "flatpak", "exports", "bin"))
++	} else {
++		for _, pattern := range []string{
++			"/etc/profiles/per-user/*/bin",
++			"/home/*/.nix-profile/bin",
++			"/home/*/.local/state/nix/profile/bin",
++			"/home/*/.local/share/flatpak/exports/bin",
++		} {
++			if matches, globErr := filepath.Glob(pattern); globErr == nil {
++				dirs = append(dirs, matches...)
++			}
++		}
++	}
++	dirs = append(dirs, "/nix/var/nix/profiles/default/bin", "/var/lib/flatpak/exports/bin")
++
++	for _, dir := range dirs {
++		candidate := filepath.Join(dir, file)
++		if fi, statErr := os.Stat(candidate); statErr == nil && !fi.IsDir() && fi.Mode()&0111 != 0 {
++			return candidate, nil
++		}
++	}
++	return "", err
++}
++
+ type DesktopEntry struct {
+ 	Name string
+ 	Icon string
+@@ -85,7 +135,7 @@
+ 	// read all aps info
+ 	var parsedEntries = make(map[string]DesktopEntry)
+ 	for _, dir := range lookupFolders {
+-		readAppsDirectory(path.Join(dir, "applications"), parsedEntries, XDG_CURRENT_DESKTOP)
++		readAppsDirectory(path.Join(dir, "applications"), parsedEntries, XDG_CURRENT_DESKTOP, HOME)
+ 	}
+ 
+ 	// process each app entry
+@@ -112,7 +162,7 @@
+ 			continue
+ 		}
+ 		execBin := strings.Trim(cols[1], "\"")
+-		execBinFull, err := exec.LookPath(execBin)
++		execBinFull, err := LookPath(execBin, HOME)
+ 		if err != nil {
+ 			continue
+ 		}
+@@ -130,7 +180,7 @@
+ 	return retValues
+ }
+ 
+-func readAppsDirectory(dirpath string, parsedEntries map[string]DesktopEntry, XDG_CURRENT_DESKTOP map[string]struct{}) error {
++func readAppsDirectory(dirpath string, parsedEntries map[string]DesktopEntry, XDG_CURRENT_DESKTOP map[string]struct{}, HOME string) error {
+ 	dirEntries, err := os.ReadDir(dirpath)
+ 	if err != nil {
+ 		return err
+@@ -149,7 +199,7 @@
+ 			continue // app key with the same ID already exists
+ 		}
+ 		entryPath := path.Join(dirpath, dEntry.Name())
+-		parsedEntry, err := parseDesktopFile(entryPath, XDG_CURRENT_DESKTOP)
++		parsedEntry, err := parseDesktopFile(entryPath, XDG_CURRENT_DESKTOP, HOME)
+ 		if err == nil {
+ 			parsedEntries[dEntry.Name()] = parsedEntry
+ 		}
+@@ -158,8 +208,8 @@
+ 	return nil
+ }
+ 
+-func parseDesktopFile(filepath string, XDG_CURRENT_DESKTOP map[string]struct{}) (DesktopEntry, error) {
+-	file, err := os.Open(filepath)
++func parseDesktopFile(entryPath string, XDG_CURRENT_DESKTOP map[string]struct{}, HOME string) (DesktopEntry, error) {
++	file, err := os.Open(entryPath)
+ 	if err != nil {
+ 		return DesktopEntry{}, err
+ 	}
+@@ -217,7 +267,7 @@
+ 				return DesktopEntry{}, fmt.Errorf("app is NoDisplay")
+ 			}
+ 		case "TryExec":
+-			if _, err := exec.LookPath(val); err != nil {
++			if _, err := LookPath(val, HOME); err != nil {
+ 				return DesktopEntry{}, fmt.Errorf("the TryExec check failed")
+ 			}
+ 		case "Terminal":
+--- a/daemon/service/service_linux.go
++++ b/daemon/service/service_linux.go
+@@ -28,11 +28,11 @@
+ import (
+ 	"fmt"
+ 	"net"
+-	"os/exec"
+ 	"path/filepath"
+ 	"regexp"
+ 	"strings"
+ 
++	"github.com/ivpn/desktop-app/daemon/oshelpers/linux/applist"
+ 	protocolTypes "github.com/ivpn/desktop-app/daemon/protocol/types"
+ 	"github.com/ivpn/desktop-app/daemon/service/firewall"
+ 	"github.com/ivpn/desktop-app/daemon/service/platform"
+@@ -169,7 +169,7 @@
+ 	}
+ 
+ 	execBin := strings.Trim(cols[1], "\"")
+-	binPath, err := exec.LookPath(execBin)
++	binPath, err := applist.LookPath(execBin, "")
+ 	if err != nil {
+ 		// do not allow to run app if no binary found
+ 		return false, err
+@@ -181,7 +181,7 @@
+ 
+ 	// Function is trying to get the real path to binary
+ 	getBinaryOriginalLocation := func(bin string) string {
+-		binPath, err := exec.LookPath(bin)
++		binPath, err := applist.LookPath(bin, "")
+ 		if err != nil {
+ 			return ""
+ 		}

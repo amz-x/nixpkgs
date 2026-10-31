@@ -17,15 +17,15 @@
   elementary-notifications,
 }:
 
-stdenv.mkDerivation rec {
+stdenv.mkDerivation {
   pname = "switchboard-plug-notifications";
-  version = "8.0.1";
+  version = "8.0.1-unstable-2026-10-24"; # nixpkgs-update: no auto update
 
   src = fetchFromGitHub {
     owner = "elementary";
     repo = "settings-notifications";
-    tag = version;
-    hash = "sha256-MYvSru/78jMhc1Rk8YuztajEdmRRssCFN7IMUHWzW78=";
+    rev = "fff879ab694092664dfea144c36df639a5ff5881";
+    hash = "sha256-xXSr4RSTiB0TFgMNWswCiBL9TNAbs8Y5M2MdHS5hH2M=";
   };
 
   nativeBuildInputs = [

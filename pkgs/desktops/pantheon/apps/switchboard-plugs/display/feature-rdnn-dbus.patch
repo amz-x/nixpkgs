@@ -1,0 +1,28 @@
+diff --git a/src/Interfaces/GalaDBus.vala b/src/Interfaces/GalaDBus.vala
+index cc7e85d..2702204 100644
+--- a/src/Interfaces/GalaDBus.vala
++++ b/src/Interfaces/GalaDBus.vala
+@@ -3,7 +3,7 @@
+  * SPDX-FileCopyrightText: 2024 elementary, Inc. (https://elementary.io)
+  */
+ 
+-[DBus (name = "org.pantheon.gala.daemon")]
++[DBus (name = "io.elementary.gala.daemon")]
+ public interface GalaDBus : Object {
+     public abstract void show_monitor_labels (MonitorLabelInfo[] label_infos) throws GLib.DBusError, GLib.IOError;
+     public abstract void hide_monitor_labels () throws GLib.DBusError, GLib.IOError;
+diff --git a/src/Widgets/DisplaysOverlay.vala b/src/Widgets/DisplaysOverlay.vala
+index 7472acb..79c44b2 100644
+--- a/src/Widgets/DisplaysOverlay.vala
++++ b/src/Widgets/DisplaysOverlay.vala
+@@ -91,8 +91,8 @@ public class Display.DisplaysOverlay : Gtk.Box {
+ 
+         GLib.Bus.get_proxy.begin<GalaDBus> (
+             GLib.BusType.SESSION,
+-            "org.pantheon.gala.daemon",
+-            "/org/pantheon/gala/daemon",
++            "io.elementary.gala.daemon",
++            "/io/elementary/gala/daemon",
+             GLib.DBusProxyFlags.NONE,
+             null,
+             (obj, res) => {

@@ -1,0 +1,26 @@
+diff --git a/src/Views/AppInfoView.vala b/src/Views/AppInfoView.vala
+index fe4a05f..732cbab 100644
+--- a/src/Views/AppInfoView.vala
++++ b/src/Views/AppInfoView.vala
+@@ -916,14 +916,19 @@ public class AppCenter.Views.AppInfoView : Adw.NavigationPage {
+                 }
+             });
+ 
++            // Video-only screenshots have no images
++            if (best_image == null || best_image.get_url () == null) {
++                return;
++            }
++
+             var captioned_url = new CaptionedUrl (
+                 screenshot.get_caption (),
+                 best_image.get_url ()
+             );
+ 
+-            if (screenshot.get_kind () == AppStream.ScreenshotKind.DEFAULT && best_image != null) {
++            if (screenshot.get_kind () == AppStream.ScreenshotKind.DEFAULT) {
+                 captioned_urls.prepend (captioned_url);
+-            } else if (best_image != null) {
++            } else {
+                 captioned_urls.append (captioned_url);
+             }
+         });

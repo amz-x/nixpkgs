@@ -18,12 +18,12 @@
 
 stdenv.mkDerivation rec {
   pname = "elementary-capnet-assist";
-  version = "9.0.0";
+  version = "9.0.0-unstable-2026-10-14"; # nixpkgs-update: no auto update
 
   src = fetchFromGitHub {
     owner = "elementary";
     repo = "capnet-assist";
-    rev = version;
+    rev = "75117f3a6ba52a137e42e137a45038885ee11151";
     hash = "sha256-IEitFJnQECEkT8eafPZ+9hPQuWoTbqfsoUh1zUfOHYM=";
   };
 

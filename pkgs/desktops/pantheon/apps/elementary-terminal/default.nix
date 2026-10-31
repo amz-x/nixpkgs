@@ -17,16 +17,22 @@
   wrapGAppsHook4,
 }:
 
-stdenv.mkDerivation rec {
+stdenv.mkDerivation {
   pname = "elementary-terminal";
-  version = "8.1.0";
+  version = "8.1.0-unstable-2026-10-19"; # nixpkgs-update: no auto update
 
   src = fetchFromGitHub {
     owner = "elementary";
     repo = "terminal";
-    tag = version;
-    hash = "sha256-npPuanin2WKuIAVbvGwBf5fGHYp7LKGac+s+28apaLU=";
+    rev = "a119bb253910b8451fd3b079629b323dc1af3687";
+    hash = "sha256-JmAyommG089S8p051Fgl+pXwxXF6jQkYVQ/PXBQZSms=";
   };
+
+  patches = [
+    # Regression from elementary/terminal#1019: `-w`/`-t` stopped adding a
+    # tab once a window is open, so Files' "Open in > Terminal" did nothing.
+    ./fix-new-tab-existing-window.patch
+  ];
 
   nativeBuildInputs = [
     desktop-file-utils

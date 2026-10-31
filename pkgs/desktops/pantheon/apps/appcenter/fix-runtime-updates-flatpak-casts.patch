@@ -1,0 +1,31 @@
+diff --git a/src/Core/FlatpakBackend.vala b/src/Core/FlatpakBackend.vala
+index ce2d7f9ad..a439449f5 100644
+--- a/src/Core/FlatpakBackend.vala
++++ b/src/Core/FlatpakBackend.vala
+@@ -777,7 +777,12 @@ public class AppCenterCore.FlatpakBackend : Object, Backend {
+         // Also get_extends is usually only a single item whereas get_addons
+         // can be quite a few so we get O(n) instead of O(n * m) for matching the components
+         // to their package.
+-        return new Gtk.FilterListModel (_packages, new AddonFilter ((FlatpakPackage) package)) {
++        unowned var fp_package = package as FlatpakPackage;
++        if (fp_package == null) {
++            return new GLib.ListStore (typeof (Package));
++        }
++
++        return new Gtk.FilterListModel (_packages, new AddonFilter (fp_package)) {
+             incremental = true,
+         };
+     }
+diff --git a/src/Core/Package.vala b/src/Core/Package.vala
+index 7271b136c..c34d66810 100644
+--- a/src/Core/Package.vala
++++ b/src/Core/Package.vala
+@@ -362,7 +362,7 @@ public class AppCenterCore.Package : Object {
+         owned get {
+             string key = "";
+             var fp_package = this as FlatpakPackage;
+-            if (fp_package.installation != null && fp_package.installation == FlatpakBackend.system_installation) {
++            if (fp_package != null && fp_package.installation != null && fp_package.installation == FlatpakBackend.system_installation) {
+                 key += "system/";
+             } else {
+                 key += "user/";

@@ -1,0 +1,19 @@
+diff --git a/data/styles/ProgressButton.scss b/data/styles/ProgressButton.scss
+index 9eec121..7e19663 100644
+--- a/data/styles/ProgressButton.scss
++++ b/data/styles/ProgressButton.scss
+@@ -28,6 +28,14 @@ button.progress {
+             min-width: 0;
+         }
+ 
++        // The stylesheet's infinite "progress" shimmer only moves the
++        // background, which is a plain color here. It still runs on the
++        // hidden progress button of every ActionStack, and GTK leaks memory
++        // on every frame of an animation between calc() values.
++        &.horizontal progress:not(.pulse) {
++            animation: none;
++        }
++
+         trough {
+             background: #{'alpha(@accent_color, 0.25)'};
+         }

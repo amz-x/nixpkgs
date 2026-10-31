@@ -1,0 +1,115 @@
+diff --git a/src/Core/FlatpakBackend.vala b/src/Core/FlatpakBackend.vala
+index f0589b9..ee827c5 100644
+--- a/src/Core/FlatpakBackend.vala
++++ b/src/Core/FlatpakBackend.vala
+@@ -1653,17 +1653,8 @@ public class AppCenterCore.FlatpakBackend : Object, Backend {
+             });
+         });
+ 
+-        transaction.operation_error.connect ((operation, e, detail) => {
+-            warning ("Flatpak installation failed: %s (detail: %d)", e.message, detail);
+-
+-            // Only cancel the transaction if this is fatal
+-            var should_continue = detail == Flatpak.TransactionErrorDetails.NON_FATAL;
+-            if (!should_continue) {
+-                job.error = e;
+-            }
+-
+-            return should_continue;
+-        });
++        var operation_error_handler = new OperationErrorHandler ("installation", job);
++        transaction.operation_error.connect (operation_error_handler.on_operation_error);
+ 
+         transaction.ready.connect (() => {
+             total_operations = transaction.get_operations ().length ();
+@@ -1764,17 +1755,8 @@ public class AppCenterCore.FlatpakBackend : Object, Backend {
+             });
+         });
+ 
+-        transaction.operation_error.connect ((operation, e, detail) => {
+-            warning ("Flatpak removal failed: %s (detail: %d)", e.message, detail);
+-
+-            // Only cancel the transaction if this is fatal
+-            var should_continue = detail == Flatpak.TransactionErrorDetails.NON_FATAL;
+-            if (!should_continue) {
+-                job.error = e;
+-            }
+-
+-            return should_continue;
+-        });
++        var operation_error_handler = new OperationErrorHandler ("removal", job);
++        transaction.operation_error.connect (operation_error_handler.on_operation_error);
+ 
+         transaction.ready.connect (() => {
+             total_operations = transaction.get_operations ().length ();
+@@ -1921,10 +1903,8 @@ public class AppCenterCore.FlatpakBackend : Object, Backend {
+             });
+         });
+ 
+-        transaction.operation_error.connect ((operation, e, detail) => {
+-            warning ("Flatpak installation failed: %s", e.message);
+-            return false;
+-        });
++        var operation_error_handler = new OperationErrorHandler ("update", null);
++        transaction.operation_error.connect (operation_error_handler.on_operation_error);
+ 
+         transaction.ready.connect (() => {
+             total_operations = transaction.get_operations ().length ();
+@@ -2166,4 +2146,57 @@ public class AppCenterCore.FlatpakBackend : Object, Backend {
+     public static unowned FlatpakBackend get_default () {
+         return instance.once (() => { return new FlatpakBackend (); });
+     }
++
++    /*
++     * libflatpak can emit operation-error without an error (e.g. when an
++     * update can't be resolved while offline) and then dereferences that
++     * NULL error itself if the handler asks to abort, crashing AppCenter.
++     * A lambda handler can't take a nullable error (Vala would reject the
++     * NULL with an assertion and return "abort"), so use a method instead.
++     *
++     * Kept alive by the local variable for the duration of the synchronous
++     * transaction.run () call.
++     */
++    private class OperationErrorHandler : Object {
++        public string kind { get; construct; }
++        // When set, non-fatal errors continue the transaction and fatal
++        // errors are reported through it; otherwise every error aborts
++        public Job? job { get; construct; }
++
++        public OperationErrorHandler (string kind, Job? job) {
++            Object (kind: kind, job: job);
++        }
++
++        public bool on_operation_error (
++            Flatpak.Transaction transaction,
++            Flatpak.TransactionOperation operation,
++            GLib.Error? e,
++            Flatpak.TransactionErrorDetails detail
++        ) {
++            if (e == null) {
++                warning ("Flatpak %s of %s failed without an error", kind, operation.get_ref ());
++
++                if (job != null && detail != Flatpak.TransactionErrorDetails.NON_FATAL && job.error == null) {
++                    job.error = new IOError.FAILED (_("Flatpak %s failed").printf (kind));
++                }
++
++                // Aborting would make libflatpak dereference the missing error
++                return true;
++            }
++
++            warning ("Flatpak %s failed: %s (detail: %d)", kind, e.message, detail);
++
++            if (job == null) {
++                return false;
++            }
++
++            // Only cancel the transaction if this is fatal
++            var should_continue = detail == Flatpak.TransactionErrorDetails.NON_FATAL;
++            if (!should_continue) {
++                job.error = e;
++            }
++
++            return should_continue;
++        }
++    }
+ }

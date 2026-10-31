@@ -26,15 +26,15 @@
   elementary-settings-daemon,
 }:
 
-stdenv.mkDerivation rec {
+stdenv.mkDerivation {
   pname = "switchboard-plug-about";
-  version = "8.2.3";
+  version = "8.2.3-unstable-2026-10-24"; # nixpkgs-update: no auto update
 
   src = fetchFromGitHub {
     owner = "elementary";
     repo = "settings-system";
-    tag = version;
-    hash = "sha256-skuMgLZTkJEWrmDGwSuCivsJrvKIUYT2YISYj7/BVe4=";
+    rev = "f0766b77f0aeb482176d6e609365187a3e5203a4";
+    hash = "sha256-UvY6KWFBYfy4Y/7ZqosJ5tK2kKNa3Xkd+VmgIu+VEQ4=";
   };
 
   nativeBuildInputs = [

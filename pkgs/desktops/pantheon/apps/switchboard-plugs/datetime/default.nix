@@ -19,15 +19,15 @@
   tzdata,
 }:
 
-stdenv.mkDerivation rec {
+stdenv.mkDerivation {
   pname = "switchboard-plug-datetime";
-  version = "8.1.0";
+  version = "8.1.0-unstable-2026-10-27"; # nixpkgs-update: no auto update
 
   src = fetchFromGitHub {
     owner = "elementary";
     repo = "switchboard-plug-datetime";
-    rev = version;
-    hash = "sha256-VOL0F0obuXVz0G5hMI/hpUf2T3H8XUw64wu4MxRi57g=";
+    rev = "70be7ebb8d7a6df860397392a37e4c506e5d9c13";
+    hash = "sha256-9cg8oPC73whfZgvR1FhKAAvx8sdjkuEG1LhZlveRKYg=";
   };
 
   patches = [

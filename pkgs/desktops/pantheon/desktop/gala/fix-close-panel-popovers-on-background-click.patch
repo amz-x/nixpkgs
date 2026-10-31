@@ -1,0 +1,37 @@
+diff --git a/src/Background/BackgroundContainer.vala b/src/Background/BackgroundContainer.vala
+index c255be4..40ddc13 100644
+--- a/src/Background/BackgroundContainer.vala
++++ b/src/Background/BackgroundContainer.vala
+@@ -20,6 +20,17 @@ public class Gala.BackgroundContainer : Meta.BackgroundGroup {
+         monitor_manager.monitors_changed.connect (update);
+ 
+         reactive = true;
++        button_press_event.connect ((event) => {
++            // Panels close their popovers when they lose focus, but clicking
++            // the wallpaper doesn't move focus anywhere, so drop it here
++            unowned var focus_window = display.focus_window;
++            if (focus_window != null && ShellClientsManager.get_instance ().is_panel_window (focus_window)) {
++                display.unset_input_focus (event.get_time ());
++            }
++
++            return Source.CONTINUE;
++        });
++
+         button_release_event.connect ((event) => {
+             float x, y;
+             event.get_coords (out x, out y);
+diff --git a/src/ShellClients/ShellClientsManager.vala b/src/ShellClients/ShellClientsManager.vala
+index 00e0a43..836351c 100644
+--- a/src/ShellClients/ShellClientsManager.vala
++++ b/src/ShellClients/ShellClientsManager.vala
+@@ -262,6 +262,10 @@ public class Gala.ShellClientsManager : Object, GestureTarget {
+         }
+     }
+ 
++    public bool is_panel_window (Meta.Window window) {
++        return window in panel_windows;
++    }
++
+     public bool is_itself_shell_window (Meta.Window window) {
+         return (
+             (window in positioned_windows && positioned_windows[window].modal) ||

@@ -22,13 +22,13 @@
 
 stdenv.mkDerivation rec {
   pname = "switchboard-plug-wacom";
-  version = "8.0.2";
+  version = "8.0.2-unstable-2026-09-22"; # nixpkgs-update: no auto update
 
   src = fetchFromGitHub {
     owner = "elementary";
     repo = "settings-wacom";
-    tag = version;
-    hash = "sha256-LA3sOY5ENaSO99AMLAqPryEfyPsKwcatzZoGOhbvCJY=";
+    rev = "e95f2310c70dd2eea1eeab45be1874c1c45b11e7";
+    hash = "sha256-UpEmpEe5AxGYA8tJrT7JfOlQ3NYlOOOjD72yBIbdobI=";
   };
 
   nativeBuildInputs = [

@@ -22,13 +22,13 @@
 
 stdenv.mkDerivation rec {
   pname = "switchboard-plug-mouse-touchpad";
-  version = "8.1.0";
+  version = "8.1.0-unstable-2026-10-24"; # nixpkgs-update: no auto update
 
   src = fetchFromGitHub {
     owner = "elementary";
     repo = "settings-mouse-touchpad";
-    tag = version;
-    hash = "sha256-KfaC1yfsL3GowcjqqwPpYQ6DJIoO7ejl0y3IQ4Gtdj8=";
+    rev = "22c53096f40b5210faecff5335a28534cda929a9";
+    hash = "sha256-JdRvDNgymaYK4HA5rMNWbuZ7o+UWObaqFDHWso6J2vc=";
   };
 
   patches = [

@@ -8,10 +8,10 @@
   ninja,
   pkg-config,
   vala,
-  granite,
+  granite7,
   libgee,
   gettext,
-  gtk3,
+  gtk4,
   json-glib,
   switchboard-with-plugs,
   wingpanel,
@@ -20,15 +20,15 @@
   libhandy,
 }:
 
-stdenv.mkDerivation rec {
+stdenv.mkDerivation {
   pname = "wingpanel-applications-menu";
-  version = "8.0.4";
+  version = "8.0.4-unstable-2026-10-29"; # nixpkgs-update: no auto update
 
   src = fetchFromGitHub {
     owner = "elementary";
     repo = "applications-menu";
-    tag = version;
-    hash = "sha256-wHPdZnHDa9DirjGEfKyAa1jKjYD6aj8QwMZ9KxqLPkM=";
+    rev = "0b152385a65de55b533fc13e406ee6d32910942a";
+    hash = "sha256-1cMObLJHpeVtc4LVXpvKmTfcFx/WgbNAgyJxxGwcOcE=";
   };
 
   patches = [
@@ -46,8 +46,8 @@ stdenv.mkDerivation rec {
   ];
 
   buildInputs = [
-    granite
-    gtk3
+    granite7
+    gtk4
     json-glib
     libgee
     libhandy

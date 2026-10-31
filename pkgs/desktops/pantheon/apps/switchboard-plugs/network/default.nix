@@ -19,15 +19,15 @@
   switchboard,
 }:
 
-stdenv.mkDerivation rec {
+stdenv.mkDerivation {
   pname = "switchboard-plug-network";
-  version = "8.2.0";
+  version = "8.2.0-unstable-2026-10-24"; # nixpkgs-update: no auto update
 
   src = fetchFromGitHub {
     owner = "elementary";
     repo = "switchboard-plug-network";
-    rev = version;
-    hash = "sha256-H43mRPEujs6A4Bk2uC3mP91Hp5I8gojaagoXUT/5eW8=";
+    rev = "737467fb79849b617859784bd85157894787a459";
+    hash = "sha256-62si7PkmBrWYIsKsUaHbU/ANfIbRav5ltF9emLYCVNc=";
   };
 
   patches = [

@@ -17,12 +17,12 @@
 
 stdenv.mkDerivation rec {
   pname = "elementary-screenshot";
-  version = "9.0.0";
+  version = "9.0.0-unstable-2026-10-12"; # nixpkgs-update: no auto update
 
   src = fetchFromGitHub {
     owner = "elementary";
     repo = "screenshot";
-    rev = version;
+    rev = "dd38d033988ad473c67b5a1840268017b666de20";
     hash = "sha256-/whMAypdjAN/0FYwkqk2VgsfL3eQ0h+ewoGspVmoIfk=";
   };
 

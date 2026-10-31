@@ -15,13 +15,13 @@
 
 stdenv.mkDerivation (finalAttrs: {
   pname = "pantheon-wayland";
-  version = "1.1.0";
+  version = "1.1.0-unstable-2026-04-24"; # nixpkgs-update: no auto update
 
   src = fetchFromGitHub {
     owner = "elementary";
     repo = "pantheon-wayland";
-    rev = finalAttrs.version;
-    hash = "sha256-Wfulo/fXsb51ShT7E2wTg56TULAK1chB59L/ggGh2EY=";
+    rev = "74020b3651bd4a11b5b3d672454d6ee4064237f2";
+    hash = "sha256-Ox08RjsyC0EpoWLitVGI3QNgwaot2UmKU7GCUfF3hWw=";
   };
 
   outputs = [

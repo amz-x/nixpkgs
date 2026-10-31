@@ -17,13 +17,13 @@
 
 stdenv.mkDerivation rec {
   pname = "switchboard-plug-onlineaccounts";
-  version = "8.0.2";
+  version = "8.0.2-unstable-2026-10-24"; # nixpkgs-update: no auto update
 
   src = fetchFromGitHub {
     owner = "elementary";
     repo = "settings-onlineaccounts";
-    rev = version;
-    hash = "sha256-0dt4E2g1nX78s2WK2HO6P/fKjXcsR61KJSpulgsZHPI=";
+    rev = "87c36d853edd57aa76e050437532fa686debbc31";
+    hash = "sha256-7ewN86xZ4XmYFB6xVpxWzsWof/SCZUuhlAnHApFXVlU=";
   };
 
   nativeBuildInputs = [
