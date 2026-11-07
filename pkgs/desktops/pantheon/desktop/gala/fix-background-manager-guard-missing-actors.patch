@@ -1,0 +1,58 @@
+From c34c2444ec107f2e559d66db48effbf15035d4fc Mon Sep 17 00:00:00 2001
+From: Javier Trujillo <javier.trujillo.jimenez@gmail.com>
+Date: Sun, 25 Oct 2026 14:17:55 +0100
+Subject: [PATCH] BackgroundManager: Guard against actors that do not exist yet
+
+set_size() reads background_actor while the first background is still
+loading, when the field is null. WorkspaceClone.update_targets() calls
+it during multitasking view construction, so Clutter logs
+"clutter_actor_get_width: assertion 'CLUTTER_IS_ACTOR (self)' failed"
+on every startup. create_background_actor() already applies the same
+monitor geometry once the actor exists, so skipping the call is safe.
+
+The async loaded handler is bound to the shared Background delegate
+instead of the actor it was created for. If update_background_actor()
+runs again while a load is in flight, the stale handler swaps the wrong
+actor in and leaves new_background_actor null, tripping the
+swap_background_actor() precondition. Check the actor identity before
+swapping.
+---
+ src/Background/BackgroundManager.vala | 13 +++++++++++++
+ 1 file changed, 13 insertions(+)
+
+diff --git a/src/Background/BackgroundManager.vala b/src/Background/BackgroundManager.vala
+index 6fd8aba86..b1762c4d2 100644
+--- a/src/Background/BackgroundManager.vala
++++ b/src/Background/BackgroundManager.vala
+@@ -106,11 +106,18 @@ public class Gala.BackgroundManager : Meta.BackgroundGroup, Gala.BackgroundManag
+             return;
+         }
+ 
++        var actor = new_background_actor;
+         ulong handler = 0;
+         handler = background.loaded.connect (() => {
+             background.disconnect (handler);
+             background.set_data<ulong> ("background-loaded-handler", 0);
+ 
++            // Another update may have replaced this actor while the background was loading.
++            // Swapping a stale actor in would leave new_background_actor null and break the swap.
++            if (new_background_actor != actor) {
++                return;
++            }
++
+             if (rounded_corners) {
+                 var monitor_geometry = display.get_monitor_geometry (monitor_index);
+                 var clip_bounds = Graphene.Rect () {
+@@ -128,6 +135,12 @@ public class Gala.BackgroundManager : Meta.BackgroundGroup, Gala.BackgroundManag
+     }
+ 
+     public new void set_size (float width, float height) {
++        // The actor does not exist yet while the first background is still loading.
++        // The size will be applied by create_background_actor() once it is loaded.
++        if (background_actor == null) {
++            return;
++        }
++
+         if (width != background_actor.width || height != background_actor.height) {
+             update_background_actor (false);
+         }

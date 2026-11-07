@@ -1,0 +1,69 @@
+diff --git a/src/Services/BackgroundManager.vala b/src/Services/BackgroundManager.vala
+index 11d4b01..0cc8834 100644
+--- a/src/Services/BackgroundManager.vala
++++ b/src/Services/BackgroundManager.vala
+@@ -26,7 +26,7 @@ namespace Wingpanel.Services {
+         TRANSLUCENT_LIGHT
+     }
+ 
+-    [DBus (name = "org.pantheon.gala.WingpanelInterface")]
++    [DBus (name = "io.elementary.gala.WingpanelInterface")]
+     public interface InterfaceBus : Object {
+         public signal void state_changed (BackgroundState state, uint animation_duration);
+ 
+@@ -37,8 +37,8 @@ namespace Wingpanel.Services {
+     }
+ 
+     public class BackgroundManager : Object {
+-        private const string DBUS_NAME = "org.pantheon.gala.WingpanelInterface";
+-        private const string DBUS_PATH = "/org/pantheon/gala/WingpanelInterface";
++        private const string DBUS_NAME = "io.elementary.gala.WingpanelInterface";
++        private const string DBUS_PATH = "/io/elementary/gala/WingpanelInterface";
+ 
+         private static BackgroundManager? instance = null;
+ 
+diff --git a/src/Services/WMDBus.vala b/src/Services/WMDBus.vala
+index 52c333b..35dde07 100644
+--- a/src/Services/WMDBus.vala
++++ b/src/Services/WMDBus.vala
+@@ -1,10 +1,10 @@
+-[DBus (name = "org.pantheon.gala")]
++[DBus (name = "io.elementary.gala")]
+ public interface Wingpanel.Services.WMDBus : GLib.Object {
+     private static WMDBus? instance = null;
+     public static async void switch_workspace (bool backwards) {
+         if (instance == null) {
+             try {
+-                instance = yield Bus.get_proxy (BusType.SESSION, "org.pantheon.gala", "/org/pantheon/gala");
++                instance = yield Bus.get_proxy (BusType.SESSION, "io.elementary.gala", "/io/elementary/gala");
+             } catch (Error e) {
+                 warning ("Failed to get gala dbus: %s", e.message);
+                 return;
+diff --git a/wingpanel-interface/DBusServer.vala b/wingpanel-interface/DBusServer.vala
+index 23ed6c5..9701952 100644
+--- a/wingpanel-interface/DBusServer.vala
++++ b/wingpanel-interface/DBusServer.vala
+@@ -17,7 +17,7 @@
+  * Boston, MA 02110-1301 USA.
+  */
+ 
+-[DBus (name = "org.pantheon.gala.WingpanelInterface")]
++[DBus (name = "io.elementary.gala.WingpanelInterface")]
+ public class WingpanelInterface.DBusServer : Object {
+     private BackgroundManager background_manager;
+     private FocusManager focus_manager;
+diff --git a/wingpanel-interface/Main.vala b/wingpanel-interface/Main.vala
+index ecb4405..9cab552 100644
+--- a/wingpanel-interface/Main.vala
++++ b/wingpanel-interface/Main.vala
+@@ -23,8 +23,8 @@
+  */
+ 
+ public class WingpanelInterface.Main : Gala.Plugin {
+-    private const string DBUS_NAME = "org.pantheon.gala.WingpanelInterface";
+-    private const string DBUS_PATH = "/org/pantheon/gala/WingpanelInterface";
++    private const string DBUS_NAME = "io.elementary.gala.WingpanelInterface";
++    private const string DBUS_PATH = "/io/elementary/gala/WingpanelInterface";
+ 
+     public static Gala.WindowManager wm;
+     public static unowned Meta.Display display;

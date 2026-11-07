@@ -39,6 +39,13 @@ stdenv.mkDerivation (finalAttrs: {
     hash = "sha256-kG1N8DXgjYAJ8fbrGHsp7eTqB20H5smzRnW0PSRUYR0=";
   };
 
+  patches = [
+    # libzeitgeist's direct DB reads run on a thread pool sharing one DbReader
+    # and a static GStringChunk, corrupting the heap of in-process clients
+    # such as wingpanel's applications menu.
+    ./fix-thread-safety.patch
+  ];
+
   nativeBuildInputs = [
     autoconf
     automake

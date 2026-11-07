@@ -1,0 +1,13 @@
+diff --git a/src/connection-editor/page-vpn.c b/src/connection-editor/page-vpn.c
+index 194cd4c..c2bd12a 100644
+--- a/src/connection-editor/page-vpn.c
++++ b/src/connection-editor/page-vpn.c
+@@ -202,7 +202,7 @@ vpn_type_filter_func (FUNC_TAG_NEW_CONNECTION_TYPE_FILTER_IMPL,
+                       GType type,
+                       gpointer user_data)
+ {
+-	return type == NM_TYPE_SETTING_VPN;
++	return type == NM_TYPE_SETTING_VPN || type == NM_TYPE_SETTING_WIREGUARD;
+ }
+ 
+ static void

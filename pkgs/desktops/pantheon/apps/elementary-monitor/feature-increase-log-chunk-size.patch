@@ -1,0 +1,11 @@
+--- a/src/Views/LogView/SystemdLogModel.vala
++++ b/src/Views/LogView/SystemdLogModel.vala
+@@ -10,7 +10,7 @@
+         return now;
+     }
+ 
+-    private const int CHUNK_SIZE = 200;
++    private const int CHUNK_SIZE = 8000;
+     private const int64 CHUNK_TIME = 1000; // 1 millisecond
+ 
+     private Systemd.Journal journal;

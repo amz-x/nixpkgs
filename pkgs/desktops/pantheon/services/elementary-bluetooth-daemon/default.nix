@@ -1,26 +1,28 @@
 {
-  stdenv,
-  lib,
   fetchFromGitHub,
+  granite7,
+  gtk4,
+  lib,
   meson,
   ninja,
-  pkg-config,
-  vala,
-  wrapGAppsHook3,
-  granite,
-  gtk3,
   nix-update-script,
+  pkg-config,
+  stdenv,
+  systemdLibs,
+  vala,
+  wrapGAppsHook4,
 }:
 
 stdenv.mkDerivation (finalAttrs: {
   pname = "elementary-bluetooth-daemon";
-  version = "1.1.0";
+  version = "1.1.0-unstable-2026-11-06";
 
+  # nixpkgs-update: no auto update
   src = fetchFromGitHub {
     owner = "elementary";
     repo = "bluetooth-daemon";
-    rev = finalAttrs.version;
-    hash = "sha256-Qr4hg2OY7l/LpGB+/yfIXCnjCXsjQLFZX9f4CoYRtLo=";
+    rev = "0b13953cf002fab4f55b0d92d7072278f0b9a7de";
+    hash = "sha256-SUQIQ/8dMxEfw7+AiL45/8d2muxixUKpvRjZw8x+lo4=";
   };
 
   nativeBuildInputs = [
@@ -28,12 +30,17 @@ stdenv.mkDerivation (finalAttrs: {
     ninja
     pkg-config
     vala
-    wrapGAppsHook3
+    wrapGAppsHook4
   ];
 
   buildInputs = [
-    granite
-    gtk3
+    granite7
+    gtk4
+    systemdLibs
+  ];
+
+  mesonFlags = [
+    "-Dsystemduserunitdir=${placeholder "out"}/lib/systemd/user"
   ];
 
   passthru = {

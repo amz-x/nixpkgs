@@ -19,7 +19,7 @@ stdenv.mkDerivation {
   };
 
   patches = [
-    (replaceVars ./exec-path.patch {
+    (replaceVars ./fix-exec-path.patch {
       file_roller = file-roller;
     })
   ];

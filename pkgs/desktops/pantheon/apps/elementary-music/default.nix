@@ -17,15 +17,16 @@
   libadwaita,
 }:
 
-stdenv.mkDerivation rec {
+stdenv.mkDerivation {
   pname = "elementary-music";
-  version = "9.0.0";
+  version = "9.0.0-unstable-2026-11-04";
 
+  # nixpkgs-update: no auto update
   src = fetchFromGitHub {
     owner = "elementary";
     repo = "music";
-    rev = version;
-    hash = "sha256-q8FPylLh4B4k9Sr8CFaismJU9SfPZaS19ANLC3SBsE8=";
+    rev = "16a202aa3ded530a45c324c3f26047f9d42295fa";
+    hash = "sha256-i/IQ6FoSLZOViSAU6IKP28wVwSXmWv1DhGoi3W/5Buo=";
   };
 
   nativeBuildInputs = [

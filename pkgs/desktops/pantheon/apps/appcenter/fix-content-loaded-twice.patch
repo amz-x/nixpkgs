@@ -1,0 +1,26 @@
+diff --git a/src/Views/AppInfoView.vala b/src/Views/AppInfoView.vala
+index 4a499a4..eb9f655 100644
+--- a/src/Views/AppInfoView.vala
++++ b/src/Views/AppInfoView.vala
+@@ -51,6 +51,7 @@ public class AppCenter.Views.AppInfoView : Adw.NavigationPage {
+ 
+     private bool is_runtime_warning_shown = false;
+     private bool permissions_shown = false;
++    private bool content_loaded = false;
+ 
+     private static AppCenterCore.ScreenshotCache? screenshot_cache;
+ 
+@@ -864,6 +865,13 @@ public class AppCenter.Views.AppInfoView : Adw.NavigationPage {
+     }
+ 
+     private void load_more_content () {
++        // realize can be emitted more than once, e.g. after the page was
++        // unrealized; don't load (and append) everything a second time
++        if (content_loaded) {
++            return;
++        }
++        content_loaded = true;
++
+         new Thread<void*> ("content-loading", () => {
+             var description = package.get_description ();
+             Idle.add (() => {

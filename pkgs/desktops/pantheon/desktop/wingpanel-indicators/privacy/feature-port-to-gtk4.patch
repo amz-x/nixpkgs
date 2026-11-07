@@ -1,0 +1,512 @@
+diff --git a/data/meson.build b/data/meson.build
+index b9dc62a..96b608e 100644
+--- a/data/meson.build
++++ b/data/meson.build
+@@ -1,7 +1,7 @@
+ i18n.merge_file(
+     input: 'privacy.appdata.xml.in',
+     output: 'io.elementary.wingpanel.privacy.appdata.xml',
+-    po_dir: join_paths(meson.source_root(), 'po', 'extra'),
++    po_dir: meson.project_source_root() / 'po' / 'extra',
+     type: 'xml',
+     install: true,
+     install_dir: join_paths(get_option('datadir'), 'metainfo'),
+diff --git a/meson.build b/meson.build
+index dde09ef..eab3dc2 100644
+--- a/meson.build
++++ b/meson.build
+@@ -8,15 +8,10 @@ libdir = join_paths(prefix, get_option('libdir'))
+ 
+ add_global_arguments('-DGETTEXT_PACKAGE="@0@"'.format(gettext_name), language:'c')
+ 
+-add_project_arguments(
+-    '--vapidir', join_paths(meson.current_source_dir(), 'vapi'),
+-    language: 'vala'
+-)
+-
+ add_project_arguments('-DG_LOG_DOMAIN="io.elementary.wingpanel.privacy"', language:'c')
+ 
+-wingpanel_dep = dependency('wingpanel')
+-wingpanel_indicatorsdir = wingpanel_dep.get_pkgconfig_variable('indicatorsdir', define_variable: ['libdir', libdir])
++wingpanel_dep = dependency('wingpanel-9')
++wingpanel_indicatorsdir = wingpanel_dep.get_variable('indicatorsdir', pkgconfig_define: ['libdir', libdir])
+ 
+ config_data = configuration_data()
+ config_data.set_quoted('LOCALEDIR', join_paths(get_option('prefix'), get_option('localedir')))
+@@ -38,15 +33,12 @@ shared_module(
+     'src/Backends/CameraBackend.vala',
+     'src/Backends/LocationBackend.vala',
+     'src/Services/DbusInterfaces.vala',
+-    'src/Services/ProcessMonitor/Monitor.vala',
+-    'src/Services/ProcessMonitor/Process.vala',
+     dependencies: [
+         dependency('glib-2.0'),
+         dependency('gobject-2.0'),
+-        dependency('gtk+-3.0'),
+-        dependency('granite'),
+-        dependency('libbamf3'),
+-        dependency('libgtop-2.0'),
++        dependency('gtk4'),
++        dependency('granite-7'),
++        dependency('gee-0.8'),
+         dependency('gio-unix-2.0'),
+         meson.get_compiler('vala').find_library('posix'),
+         wingpanel_dep
+diff --git a/src/Backends/CameraBackend.vala b/src/Backends/CameraBackend.vala
+index e75a7c6..d8e4517 100644
+--- a/src/Backends/CameraBackend.vala
++++ b/src/Backends/CameraBackend.vala
+@@ -23,15 +23,11 @@ public class Privacy.Backends.Camera : Privacy.AbstractBackend {
+ 
+     private Widgets.AppList app_list_widget;
+     private bool icon_visible = false;
+-    private Gee.ArrayList<string> lsof_outputs;
+-    private Bamf.Matcher app_matcher;
+-    private Gee.HashMap<int, AppInfo> appinfo_by_pid;
++    private Gee.HashSet<int> camera_pids;
+ 
+     public Camera () {
+         app_list_widget = new Widgets.AppList (BACKEND_NAME);
+-        appinfo_by_pid = new Gee.HashMap<int, AppInfo> ();
+-        app_matcher = Bamf.Matcher.get_default ();
+-        lsof_outputs = new Gee.ArrayList<string> ();
++        camera_pids = new Gee.HashSet<int> ();
+     }
+ 
+     public override Gtk.Widget get_app_list () {
+@@ -39,7 +35,7 @@ public class Privacy.Backends.Camera : Privacy.AbstractBackend {
+     }
+ 
+     public override void added () {
+-        Timeout.add (1000, () => {
++        Timeout.add_seconds (1, () => {
+             bool in_use = check_camera_in_use ();
+             if (!icon_visible && in_use) {
+                 activated ();
+@@ -49,95 +45,159 @@ public class Privacy.Backends.Camera : Privacy.AbstractBackend {
+                 deactivated ();
+                 icon_visible = false;
+             }
+-            return true;
++            return Source.CONTINUE;
+         });
+     }
+ 
+-    private void update_running_pids () {
+-        var pm = Services.ProcessMonitor.Monitor.get_default ();
+-        pm.update ();
+-        var applications = app_matcher.get_running_applications ();
+-
+-        applications.@foreach ((app) => {
+-            var appinfo = new DesktopAppInfo.from_filename (app.get_desktop_file ());
+-            foreach (var window in app.get_windows ()) {
+-                var parent_pid = (int)window.get_pid ();
+-                appinfo_by_pid[parent_pid] = appinfo;
+-                var sub_processes = pm.get_sub_processes (parent_pid);
+-                foreach (int sp_pid in sub_processes) {
+-                    appinfo_by_pid[sp_pid] = appinfo;
++    /*
++     * Look for processes of this user holding a video device open. This replaces
++     * spawning lsof every second, and only sees the same processes lsof could.
++     */
++    private bool check_camera_in_use () {
++        camera_pids.clear ();
++
++        try {
++            var proc_dir = Dir.open ("/proc");
++            unowned string? name;
++            while ((name = proc_dir.read_name ()) != null) {
++                int pid;
++                if (int.try_parse (name, out pid) && process_uses_camera (pid)) {
++                    camera_pids.add (pid);
+                 }
+             }
+-        });
++        } catch (FileError e) {
++            warning ("Unable to list processes: %s", e.message);
++        }
++
++        return camera_pids.size > 0;
+     }
+ 
+-    private bool check_camera_in_use () {
+-        uint dev_num = 0;
+-        lsof_outputs.clear ();
+-        var device_path = "/dev/video%u".printf (dev_num);
+-        while (FileUtils.test (device_path, FileTest.EXISTS)) {
+-            string lsof_stdout;
+-            try {
+-                Process.spawn_command_line_sync ("lsof %s".printf (device_path), out lsof_stdout);
+-            } catch (SpawnError e) {
+-                warning ("Error calling lsof to check video device: %s", e.message);
+-            }
+-            if (lsof_stdout.length > 0) {
+-                lsof_outputs.add (lsof_stdout);
++    private bool process_uses_camera (int pid) {
++        var fd_path = "/proc/%d/fd".printf (pid);
++
++        try {
++            var fd_dir = Dir.open (fd_path);
++            unowned string? fd;
++            while ((fd = fd_dir.read_name ()) != null) {
++                try {
++                    if (FileUtils.read_link (Path.build_filename (fd_path, fd)).has_prefix ("/dev/video")) {
++                        return true;
++                    }
++                } catch (FileError e) {
++                    // fd closed while iterating
++                }
+             }
+-            dev_num++;
+-            device_path = "/dev/video%u".printf (dev_num);
+-        }
+-        if (lsof_outputs.size > 0) {
+-            return true;
+-        } else {
+-            return false;
++        } catch (FileError e) {
++            // Process exited or belongs to another user
+         }
++
++        return false;
+     }
+ 
+     public override void update_app_list () {
+-        update_running_pids ();
+-
+         app_list_widget.clear_apps ();
+-        Gee.ArrayList<string> added_pids = new Gee.ArrayList<string> ();
+-        foreach (var lsof_stdout in lsof_outputs) {
+-            string[] lines = lsof_stdout.split ("\n");
+-            if (lines.length > 1) {
+-                for (int i = 1; i < lines.length; i++) {
+-                    string[] cols = lines[i].split (" ");
+-                    if (cols.length < 2) {
+-                        break;
+-                    }
+-                    string pid = "";
+-                    for (int j = 1; j < cols.length; j++) {
+-                        if (cols[j] != "") {
+-                            pid = cols[j];
+-                            break;
+-                        }
+-                    }
+-                    if (pid in added_pids) {
+-                        break;
+-                    }
+-                    var app_info = get_appinfo_from_pid (pid);
+-                    if (app_info == null) {
+-                        var pm = Services.ProcessMonitor.Monitor.get_default ();
+-                        var name = pm.get_process (int.parse (pid)).exe_name;
+-                        app_list_widget.add_unknown_app (name);
+-                    } else {
+-                        app_list_widget.add_app (app_info);
+-                    }
+-                    added_pids.add (pid);
++
++        foreach (var pid in camera_pids) {
++            var app_info = get_appinfo_from_pid (pid);
++            if (app_info != null) {
++                app_list_widget.add_app (app_info);
++            } else {
++                app_list_widget.add_unknown_app (get_process_name (pid));
++            }
++        }
++    }
++
++    /*
++     * Apps launched by the desktop are placed in a systemd unit named after
++     * their app ID, e.g. "app-gnome-org.gnome.Snapshot-1234.scope" or
++     * "app-flatpak-org.gnome.Snapshot-1234.scope", which works on Wayland
++     * where there is no window to pid mapping.
++     */
++    private AppInfo? get_appinfo_from_pid (int pid) {
++        string cgroup;
++        try {
++            FileUtils.get_contents ("/proc/%d/cgroup".printf (pid), out cgroup);
++        } catch (FileError e) {
++            return null;
++        }
++
++        foreach (unowned var line in cgroup.strip ().split ("\n")) {
++            var path = line.substring (line.last_index_of_char (':') + 1);
++            var units = path.split ("/");
++
++            // Innermost unit first, child scopes may have been created by the app itself
++            for (int i = units.length - 1; i >= 0; i--) {
++                var app_info = get_appinfo_from_unit (units[i]);
++                if (app_info != null) {
++                    return app_info;
+                 }
+             }
+         }
++
++        return null;
+     }
+ 
+-    private AppInfo? get_appinfo_from_pid (string pid) {
+-        var int_pid = int.parse (pid);
+-        if (appinfo_by_pid.has_key (int_pid)) {
+-            return appinfo_by_pid[int_pid];
++    private AppInfo? get_appinfo_from_unit (string unit) {
++        if (!unit.has_prefix ("app-")) {
++            return null;
++        }
++
++        string name;
++        if (unit.has_suffix (".service")) {
++            name = unit.substring (4, unit.length - 4 - ".service".length);
++            var at = name.index_of_char ('@');
++            if (at >= 0) {
++                name = name.substring (0, at);
++            }
++        } else if (unit.has_suffix (".scope")) {
++            name = unit.substring (4, unit.length - 4 - ".scope".length);
++            var dash = name.last_index_of_char ('-');
++            if (dash >= 0) {
++                name = name.substring (0, dash);
++            }
+         } else {
+             return null;
+         }
++
++        name = unescape_unit_name (name);
++
++        // Strip the optional launcher prefix ("gnome-", "flatpak-", ...) if the full name doesn't match
++        while (true) {
++            var app_info = new DesktopAppInfo (name + ".desktop");
++            if (app_info != null) {
++                return app_info;
++            }
++
++            var dash = name.index_of_char ('-');
++            if (dash < 0) {
++                return null;
++            }
++
++            name = name.substring (dash + 1);
++        }
++    }
++
++    private static string unescape_unit_name (string name) {
++        var builder = new StringBuilder ();
++        for (int i = 0; i < name.length; i++) {
++            if (name[i] == '\\' && i + 3 < name.length && name[i + 1] == 'x') {
++                builder.append_c ((char) (name[i + 2].xdigit_value () * 16 + name[i + 3].xdigit_value ()));
++                i += 3;
++            } else {
++                builder.append_c (name[i]);
++            }
++        }
++
++        return builder.str;
++    }
++
++    private static string? get_process_name (int pid) {
++        try {
++            string comm;
++            FileUtils.get_contents ("/proc/%d/comm".printf (pid), out comm);
++            return comm.strip ();
++        } catch (FileError e) {
++            return null;
++        }
+     }
+ }
+diff --git a/src/Indicator.vala b/src/Indicator.vala
+index e259798..d5b9d40 100644
+--- a/src/Indicator.vala
++++ b/src/Indicator.vala
+@@ -19,17 +19,17 @@
+ 
+ public class Privacy.Indicator : Wingpanel.Indicator {
+     private Widgets.DisplayWidget? indicator_icon = null;
+-    private Gtk.ModelButton settings;
++    private Wingpanel.PopoverMenuItem settings;
+ 
+     private Gee.ArrayList<AbstractBackend> backends;
+ 
+-    private Gtk.Grid main_grid;
++    private Gtk.Box main_box;
+ 
+     public Indicator () {
+         GLib.Intl.bindtextdomain (GETTEXT_PACKAGE, LOCALEDIR);
+         GLib.Intl.bind_textdomain_codeset (GETTEXT_PACKAGE, "UTF-8");
+ 
+-        Object (code_name: Wingpanel.Indicator.PRIVACY,
++        Object (code_name: "privacy",
+                 visible: false);
+ 
+         backends = new Gee.ArrayList<AbstractBackend> ();
+@@ -57,18 +57,17 @@ public class Privacy.Indicator : Wingpanel.Indicator {
+     }
+ 
+     public override Gtk.Widget? get_widget () {
+-        if (main_grid == null) {
+-            main_grid = new Gtk.Grid ();
+-            main_grid.set_orientation (Gtk.Orientation.VERTICAL);
++        if (main_box == null) {
++            main_box = new Gtk.Box (VERTICAL, 0);
+ 
+-            settings = new Gtk.ModelButton () {
++            settings = new Wingpanel.PopoverMenuItem () {
+                 text = _("Privacy Settings…")
+             };
+ 
+             foreach (var backend in backends) {
+-                main_grid.add (backend.get_app_list ());
++                main_box.append (backend.get_app_list ());
+             }
+-            main_grid.add (settings);
++            main_box.append (settings);
+ 
+             settings.clicked.connect (() => {
+                 close ();
+@@ -76,7 +75,7 @@ public class Privacy.Indicator : Wingpanel.Indicator {
+             });
+         }
+ 
+-        return main_grid;
++        return main_box;
+     }
+ 
+     private void show_settings () {
+@@ -96,8 +95,8 @@ public class Privacy.Indicator : Wingpanel.Indicator {
+     public override void closed () {}
+ }
+ 
+-public Wingpanel.Indicator? get_indicator (Module module, Wingpanel.IndicatorManager.ServerType server_type) {
+-    if (server_type != Wingpanel.IndicatorManager.ServerType.SESSION) {
++public Wingpanel.Indicator? get_indicator (Module module, Wingpanel.ServerType server_type) {
++    if (server_type != Wingpanel.ServerType.SESSION) {
+         return null;
+     }
+ 
+diff --git a/src/Widgets/AppList.vala b/src/Widgets/AppList.vala
+index 464d9b0..45655f3 100644
+--- a/src/Widgets/AppList.vala
++++ b/src/Widgets/AppList.vala
+@@ -17,30 +17,33 @@
+  * Boston, MA 02110-1301 USA.
+  */
+ 
+-public class Privacy.Widgets.AppList : Gtk.Revealer {
++public class Privacy.Widgets.AppList : Gtk.Box {
+     private string title;
+-    private Gtk.Grid main_grid;
++    private Gtk.Revealer revealer;
++    private Gtk.Box main_box;
+     private Gee.HashSet<AppListRow> app_list;
+ 
+     public AppList (string title) {
+-        main_grid = new Gtk.Grid ();
+-        main_grid.orientation = Gtk.Orientation.VERTICAL;
+-        app_list = new Gee.HashSet<AppListRow> ();
++        main_box = new Gtk.Box (VERTICAL, 0);
++        app_list = new Gee.HashSet<AppListRow> ((row) => row.hash (), (a, b) => a.equal (b));
+ 
+-        add (main_grid);
++        revealer = new Gtk.Revealer () {
++            child = main_box
++        };
++        append (revealer);
+ 
+         this.title = title;
+         update_list ();
+     }
+ 
+-    private void clear_grid () {
+-        foreach (var child in main_grid.get_children ()) {
+-            main_grid.remove (child);
++    private void clear_box () {
++        while (main_box.get_first_child () != null) {
++            main_box.remove (main_box.get_first_child ());
+         }
+     }
+ 
+     private void update_list () {
+-        clear_grid ();
++        clear_box ();
+ 
+         var title_label = new Granite.HeaderLabel (_("Apps Using %s").printf (title)) {
+             margin_end = 12,
+@@ -48,23 +51,18 @@ public class Privacy.Widgets.AppList : Gtk.Revealer {
+             hexpand = true
+         };
+ 
+-        main_grid.add (title_label);
++        main_box.append (title_label);
+ 
+         foreach (var app in app_list) {
+-            main_grid.add (app);
++            main_box.append (app);
+         }
+ 
+         var separator = new Gtk.Separator (Gtk.Orientation.HORIZONTAL) {
+             margin_top = 3,
+             margin_bottom = 3
+         };
+-        main_grid.add (separator);
+-        main_grid.show_all ();
+-        if (app_list.size > 0) {
+-            set_reveal_child (true);
+-        } else {
+-            set_reveal_child (false);
+-        }
++        main_box.append (separator);
++        revealer.reveal_child = app_list.size > 0;
+     }
+ 
+     public void add_app (AppInfo app) {
+diff --git a/src/Widgets/AppListRow.vala b/src/Widgets/AppListRow.vala
+index e2c2001..e7e6a66 100644
+--- a/src/Widgets/AppListRow.vala
++++ b/src/Widgets/AppListRow.vala
+@@ -40,9 +40,9 @@ public class Privacy.Widgets.AppListRow : Gtk.Grid {
+         var app_name = app.get_name ();
+ 
+         if (app_icon == null) {
+-            icon = new Gtk.Image.from_icon_name ("application-default-icon", Gtk.IconSize.LARGE_TOOLBAR);
++            icon = new Gtk.Image.from_icon_name ("application-default-icon");
+         } else {
+-            icon = new Gtk.Image.from_gicon (app_icon, Gtk.IconSize.LARGE_TOOLBAR);
++            icon = new Gtk.Image.from_gicon (app_icon);
+         }
+ 
+         if (app_name == null) {
+@@ -59,7 +59,7 @@ public class Privacy.Widgets.AppListRow : Gtk.Grid {
+     }
+ 
+     public AppListRow.with_label (string? label_text = null) {
+-        icon = new Gtk.Image.from_icon_name ("application-default-icon", Gtk.IconSize.LARGE_TOOLBAR);
++        icon = new Gtk.Image.from_icon_name ("application-default-icon");
+         if (label_text != null) {
+             label = new Gtk.Label (label_text);
+         } else {
+diff --git a/src/Widgets/DisplayWidget.vala b/src/Widgets/DisplayWidget.vala
+index 99e8746..b041158 100644
+--- a/src/Widgets/DisplayWidget.vala
++++ b/src/Widgets/DisplayWidget.vala
+@@ -27,16 +27,15 @@ public class Privacy.Widgets.DisplayWidget : Gtk.Box {
+     }
+ 
+     public void add_backend (AbstractBackend backend) {
+-        var revealer = new Gtk.Revealer ();
+-        revealer.transition_type = Gtk.RevealerTransitionType.SLIDE_RIGHT;
+-        revealers.add (revealer);
++        var icon = new Gtk.Image.from_icon_name (backend.ICON_NAME);
+ 
+-        var icon = new Gtk.Image ();
+-        icon.icon_name = backend.ICON_NAME;
+-        icon.icon_size = Gtk.IconSize.LARGE_TOOLBAR;
++        var revealer = new Gtk.Revealer () {
++            child = icon,
++            transition_type = SLIDE_RIGHT
++        };
++        revealers.add (revealer);
+ 
+-        revealer.add (icon);
+-        add (revealer);
++        append (revealer);
+ 
+         backend.activated.connect (() => {
+             revealer.set_reveal_child (true);

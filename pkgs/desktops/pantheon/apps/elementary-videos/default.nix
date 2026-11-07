@@ -16,16 +16,29 @@
   libgee,
 }:
 
-stdenv.mkDerivation rec {
+stdenv.mkDerivation {
   pname = "elementary-videos";
-  version = "9.0.0";
+  version = "9.0.0-unstable-2026-11-05";
 
+  # nixpkgs-update: no auto update
   src = fetchFromGitHub {
     owner = "elementary";
     repo = "videos";
-    rev = version;
-    hash = "sha256-a6KV3F/18CkAc810WhZUvu/5wLi3bhi/Y8MBSwah5eU=";
+    rev = "64f2a5732af730ca3cae2401068317edfff8d71c";
+    hash = "sha256-xxpXqtKUp11ZDCYCf+BYdboqBpkDMHCeuwV3w9gtwAc=";
   };
+
+  patches = [
+    # Closing the nested audio/subtitle combobox popup drops the settings
+    # popover's autohide grab (GTK < 4.24), so it no longer closes on outside
+    # clicks; close the popover with it like switchboard-plug-display does.
+    ./fix-settings-popover-autohide.patch
+
+    # Escape quit the app (Ctrl+Q already does) and, being handled on key
+    # release, also fired after closing a popover or clearing the search entry.
+    # Escape now leaves fullscreen, or otherwise goes back to the library.
+    ./fix-escape-closing-popovers-quitting.patch
+  ];
 
   nativeBuildInputs = [
     meson

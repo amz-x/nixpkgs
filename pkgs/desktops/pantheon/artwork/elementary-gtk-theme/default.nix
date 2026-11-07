@@ -10,15 +10,16 @@
   sassc,
 }:
 
-stdenvNoCC.mkDerivation rec {
+stdenvNoCC.mkDerivation {
   pname = "elementary-gtk-theme";
-  version = "8.2.2";
+  version = "8.2.2-unstable-2026-11-06";
 
+  # nixpkgs-update: no auto update
   src = fetchFromGitHub {
     owner = "elementary";
     repo = "stylesheet";
-    rev = version;
-    hash = "sha256-ZjeufUC3Eg1do3GKN1kW/EceuWfAsFnOkSCmscL+vxg=";
+    rev = "17a60e20bb4785db40d368c1e057c6a9cc13bf49";
+    hash = "sha256-KU6IyBTX9n9h+v1InKz0hp3DGBc6s5FxRASvO2PoqFQ=";
   };
 
   nativeBuildInputs = [

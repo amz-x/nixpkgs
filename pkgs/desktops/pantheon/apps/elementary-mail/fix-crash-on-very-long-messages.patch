@@ -1,0 +1,60 @@
+diff --git a/src/WebView.vala b/src/WebView.vala
+index b24bc96..6dcd5d1 100644
+--- a/src/WebView.vala
++++ b/src/WebView.vala
+@@ -31,6 +31,15 @@ public class Mail.WebView : WebKit.WebView {
+     public bool body_html_changed { get; private set; default = false; }
+ 
+     private const string INTERNAL_URL_BODY = "elementary-mail:body";
++
++    /*
++     * Inside the message list's scrolled view, GTK 3 draws the web view by
++     * reading it back into a temporary Cairo image the full size of the view.
++     * Cairo can't create images taller than 32767 pixels, and GTK 3 doesn't
++     * check, so a very long message crashed Mail. Past this height the rest
++     * of the message scrolls inside the web view instead.
++     */
++    private const int MAX_HEIGHT_PIXELS = 16384;
+     private const string SERVER_BUS_NAME = "io.elementary.mail.WebViewServer";
+ 
+     private Gee.Map<string, InputStream> internal_resources;
+@@ -71,6 +80,11 @@ public class Mail.WebView : WebKit.WebView {
+         key_release_event.connect (() => {
+             body_html_changed = true;
+         });
++
++        notify["scale-factor"].connect (() => {
++            update_height ();
++            queue_resize ();
++        });
+     }
+ 
+     public WebView () {
+@@ -115,6 +129,18 @@ public class Mail.WebView : WebKit.WebView {
+         }
+     }
+ 
++    private int get_max_height () {
++        return MAX_HEIGHT_PIXELS / int.max (1, scale_factor);
++    }
++
++    // WebKit asks for the page's whole height as its natural height
++    public override void get_preferred_height (out int minimum_height, out int natural_height) {
++        base.get_preferred_height (out minimum_height, out natural_height);
++
++        minimum_height = int.min (minimum_height, get_max_height ());
++        natural_height = int.min (natural_height, get_max_height ());
++    }
++
+     private void update_height () {
+         if (!bind_height_to_page_height) {
+             return;
+@@ -124,7 +150,7 @@ public class Mail.WebView : WebKit.WebView {
+         send_message_to_page.begin (message, cancellable, (obj, res) => {
+             try {
+                 var response = send_message_to_page.end (res);
+-                height_request = response.parameters.get_int32 ();
++                height_request = int.min (response.parameters.get_int32 (), get_max_height ());
+             } catch (Error e) {
+                 // We can cancel the operation
+                 if (!(e is GLib.IOError.CANCELLED)) {

@@ -1,0 +1,68 @@
+diff --git a/src/Views/CategoryView.vala b/src/Views/CategoryView.vala
+index 9457c2b..cf77441 100644
+--- a/src/Views/CategoryView.vala
++++ b/src/Views/CategoryView.vala
+@@ -110,22 +110,7 @@ public class AppCenter.CategoryView : Adw.NavigationPage {
+                 package_list.append (package);
+             }
+ 
+-            var datetime = new GLib.DateTime.now_local ().add_months (-6);
+-            var recent_filter_model = new Gtk.FilterListModel (package_list, new Gtk.CustomFilter ((obj) => {
+-                var package = (AppCenterCore.Package) obj;
+-
+-                var newest_release = package.get_newest_release ();
+-                if (newest_release == null) {
+-                    return false;
+-                }
+-
+-                // Don't add packages over 6 months old
+-                if (newest_release.get_timestamp () < datetime.to_unix ()) {
+-                    return false;
+-                }
+-
+-                return true;
+-            }));
++            var recent_filter_model = new Gtk.FilterListModel (package_list, new_recent_filter ());
+ 
+             var recent_sort_model = new Gtk.SortListModel (
+                 recent_filter_model,
+@@ -153,6 +138,27 @@ public class AppCenter.CategoryView : Adw.NavigationPage {
+         });
+     }
+ 
++    // Static so that the filter's closure doesn't hold a reference to this
++    // page: the filter ends up in a model bound to one of its own flowboxes
++    private static Gtk.CustomFilter new_recent_filter () {
++        var datetime = new GLib.DateTime.now_local ().add_months (-6);
++        return new Gtk.CustomFilter ((obj) => {
++            var package = (AppCenterCore.Package) obj;
++
++            var newest_release = package.get_newest_release ();
++            if (newest_release == null) {
++                return false;
++            }
++
++            // Don't add packages over 6 months old
++            if (newest_release.get_timestamp () < datetime.to_unix ()) {
++                return false;
++            }
++
++            return true;
++        });
++    }
++
+     private async Gee.Collection<AppCenterCore.Package> get_packages () {
+         SourceFunc callback = get_packages.callback;
+ 
+@@ -230,7 +236,10 @@ public class AppCenter.CategoryView : Adw.NavigationPage {
+             flowbox.bind_model (model, create_widget_func);
+         }
+ 
+-        private Gtk.Widget create_widget_func (Object object) {
++        // Static so that binding it doesn't hand the flowbox a reference to
++        // this widget, which owns the flowbox: that cycle kept every category
++        // page, with all of its rows and icons, alive forever
++        private static Gtk.Widget create_widget_func (Object object) {
+             unowned var package = (AppCenterCore.Package) object;
+             var package_row = new Widgets.ListPackageRowGrid (package);
+             size_group.add_widget (package_row);

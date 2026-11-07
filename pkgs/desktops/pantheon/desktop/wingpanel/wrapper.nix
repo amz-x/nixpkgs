@@ -1,6 +1,6 @@
 {
   lib,
-  wrapGAppsHook3,
+  wrapGAppsHook4,
   glib,
   stdenv,
   lndir,
@@ -32,7 +32,7 @@ stdenv.mkDerivation {
 
   nativeBuildInputs = [
     glib
-    wrapGAppsHook3
+    wrapGAppsHook4
   ];
 
   buildInputs = lib.concatMap (x: x.buildInputs) selectedIndicators ++ selectedIndicators;
@@ -53,7 +53,7 @@ stdenv.mkDerivation {
 
   preFixup = ''
     gappsWrapperArgs+=(
-      --set WINGPANEL_INDICATORS_PATH "$out/lib/wingpanel"
+      --set WINGPANEL_INDICATORS_PATH "$out/lib/wingpanel-9"
       --set SWITCHBOARD_PLUGS_PATH "${switchboard-with-plugs}/lib/switchboard-3"
     )
   '';

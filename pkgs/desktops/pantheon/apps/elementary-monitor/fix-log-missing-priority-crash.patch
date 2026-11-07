@@ -1,0 +1,13 @@
+--- a/src/Views/LogView/SystemdLogModel.vala
++++ b/src/Views/LogView/SystemdLogModel.vala
+@@ -149,6 +149,10 @@
+         }
+ 
+         res = journal.get_data ("PRIORITY", out priority_data);
++        if (res != 0) {
++            // Not every entry has a priority, journald treats those as info
++            priority_data = "PRIORITY=6".data;
++        }
+ 
+         var origin = ((string) comm_data).offset ("_COMM=".length);
+         var message = ((string) data).offset ("MESSAGE=".length);

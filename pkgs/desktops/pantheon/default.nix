@@ -26,6 +26,7 @@ lib.makeScope pkgs.newScope (
       switchboard-plug-security-privacy
       switchboard-plug-sharing
       switchboard-plug-sound
+      switchboard-plug-useraccounts
       switchboard-plug-wacom
     ];
 
@@ -39,16 +40,17 @@ lib.makeScope pkgs.newScope (
       wingpanel-indicator-nightlight
       wingpanel-indicator-notifications
       wingpanel-indicator-power
+      wingpanel-indicator-privacy
       wingpanel-indicator-sound
       wingpanel-quick-settings
     ];
 
     teams = [ lib.teams.pantheon ];
 
-    mutter = pkgs.mutter48;
+    mutter = pkgs.mutter50;
 
-    # Using 48 to match Mutter used in Pantheon
-    gnome-settings-daemon = pkgs.gnome-settings-daemon48;
+    # Using 50 to match Mutter used in Pantheon
+    gnome-settings-daemon = pkgs.gnome-settings-daemon50;
 
     elementary-gsettings-schemas = callPackage ./desktop/elementary-gsettings-schemas { };
 
@@ -65,6 +67,8 @@ lib.makeScope pkgs.newScope (
     elementary-camera = callPackage ./apps/elementary-camera { };
 
     elementary-code = callPackage ./apps/elementary-code { };
+
+    elementary-contacts = callPackage ./apps/elementary-contacts { };
 
     elementary-dock = callPackage ./apps/elementary-dock { };
 
@@ -104,8 +108,6 @@ lib.makeScope pkgs.newScope (
 
     elementary-onboarding = callPackage ./desktop/elementary-onboarding { };
 
-    elementary-print-shim = callPackage ./desktop/elementary-print-shim { };
-
     elementary-session-settings = callPackage ./desktop/elementary-session-settings { };
 
     elementary-shortcut-overlay = callPackage ./desktop/elementary-shortcut-overlay { };
@@ -125,6 +127,8 @@ lib.makeScope pkgs.newScope (
     granite = callPackage ./libraries/granite { };
 
     granite7 = callPackage ./libraries/granite/7 { };
+
+    granite9 = callPackage ./libraries/granite/9 { };
 
     live-chart = callPackage ./libraries/live-chart { };
 
@@ -152,8 +156,6 @@ lib.makeScope pkgs.newScope (
 
     wingpanel-applications-menu = callPackage ./desktop/wingpanel-indicators/applications-menu { };
 
-    wingpanel-indicator-a11y = callPackage ./desktop/wingpanel-indicators/a11y { };
-
     wingpanel-indicator-bluetooth = callPackage ./desktop/wingpanel-indicators/bluetooth { };
 
     wingpanel-indicator-datetime = callPackage ./desktop/wingpanel-indicators/datetime { };
@@ -167,6 +169,8 @@ lib.makeScope pkgs.newScope (
     wingpanel-indicator-notifications = callPackage ./desktop/wingpanel-indicators/notifications { };
 
     wingpanel-indicator-power = callPackage ./desktop/wingpanel-indicators/power { };
+
+    wingpanel-indicator-privacy = callPackage ./desktop/wingpanel-indicators/privacy { };
 
     wingpanel-indicator-sound = callPackage ./desktop/wingpanel-indicators/sound { };
 
@@ -214,6 +218,8 @@ lib.makeScope pkgs.newScope (
 
     switchboard-plug-sound = callPackage ./apps/switchboard-plugs/sound { };
 
+    switchboard-plug-useraccounts = callPackage ./apps/switchboard-plugs/useraccounts { };
+
     switchboard-plug-wacom = callPackage ./apps/switchboard-plugs/wacom { };
 
     ### ARTWORK
@@ -245,6 +251,8 @@ lib.makeScope pkgs.newScope (
 
   cerbere = throw "Cerbere is now obsolete https://github.com/elementary/cerbere/releases/tag/2.5.1."; # added 2020-04-06
 
+  elementary-print-shim = throw "pantheon.elementary-print-shim has been removed, abandoned by upstream."; # added 2026-10-28
+
   elementary-screenshot-tool = throw "The ‘pantheon.elementary-screenshot-tool’ alias was removed on 2022-02-02, please use ‘pantheon.elementary-screenshot’ directly."; # added 2021-07-21
 
   evince = pkgs.evince; # added 2022-03-18
@@ -260,5 +268,7 @@ lib.makeScope pkgs.newScope (
   switchboard-plug-a11y = throw "pantheon.switchboard-plug-a11y has been removed, abandoned by upstream."; # added 2024-08-23
 
   wingpanel-indicator-session = throw "pantheon.wingpanel-indicator-session has been removed, abandoned by upstream."; # added 2024-08-23
+
+  wingpanel-indicator-a11y = throw "pantheon.wingpanel-indicator-a11y has been removed, abandoned by upstream."; # added 2026-09-13
 
 }

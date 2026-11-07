@@ -1,0 +1,135 @@
+diff --git a/daemon/DBus.vala b/daemon/DBus.vala
+index 50fe65d..fc68b32 100644
+--- a/daemon/DBus.vala
++++ b/daemon/DBus.vala
+@@ -12,7 +12,7 @@ public struct Gala.Daemon.MonitorLabelInfo {
+     public int y;
+ }
+ 
+-[DBus (name = "org.pantheon.gala.daemon")]
++[DBus (name = "io.elementary.gala.daemon")]
+ public class Gala.Daemon.DBus : GLib.Object {
+     private const string BG_MENU_ACTION_GROUP_PREFIX = "background-menu";
+     private const string BG_MENU_ACTION_PREFIX = BG_MENU_ACTION_GROUP_PREFIX + ".";
+diff --git a/daemon/Main.vala b/daemon/Main.vala
+index a6fffd9..0afe089 100644
+--- a/daemon/Main.vala
++++ b/daemon/Main.vala
+@@ -8,7 +8,7 @@ public class Gala.Daemon.Application : Gtk.Application {
+     private OSKManager osk_manager;
+ 
+     public Application () {
+-        Object (application_id: "org.pantheon.gala.daemon");
++        Object (application_id: "io.elementary.gala.daemon");
+     }
+ 
+     construct {
+diff --git a/data/gala-multitaskingview.desktop.in b/data/gala-multitaskingview.desktop.in
+index cefa598..67fc485 100644
+--- a/data/gala-multitaskingview.desktop.in
++++ b/data/gala-multitaskingview.desktop.in
+@@ -6,6 +6,6 @@ GenericName=Multitasking View
+ Icon=preferences-desktop-workspaces
+ Terminal=false
+ Categories=GNOME;GTK;System;
+-Exec=dbus-send --session --dest=org.pantheon.gala --print-reply /org/pantheon/gala org.pantheon.gala.PerformAction int32:1
++Exec=dbus-send --session --dest=io.elementary.gala --print-reply /io/elementary/gala io.elementary.gala.PerformAction int32:1
+ X-AppStream-Ignore=true
+ OnlyShowIn=Pantheon;
+diff --git a/src/DBus.vala b/src/DBus.vala
+index 9ff0aa0..35548f9 100644
+--- a/src/DBus.vala
++++ b/src/DBus.vala
+@@ -5,7 +5,7 @@
+  *                         2012-2014 Jacob Parker
+  */
+ 
+-[DBus (name="org.pantheon.gala")]
++[DBus (name="io.elementary.gala")]
+ public class Gala.DBus {
+     private static DBus? instance;
+     private static WindowManagerGala wm;
+@@ -17,18 +17,6 @@ public class Gala.DBus {
+     ) {
+         wm = _wm;
+ 
+-        Bus.own_name (
+-            SESSION, "io.elementary.gala", NONE, null,
+-            (connection, name) => {
+-                try {
+-                    connection.register_object ("/io/elementary/gala", WindowDragProvider.get_instance ());
+-                } catch (Error e) {
+-                    warning (e.message);
+-                }
+-            },
+-            on_name_lost
+-        );
+-
+ #if HAS_MUTTER50
+         var brightness_manager = new BrightnessManager (wm.get_display ());
+ 
+@@ -58,15 +46,16 @@ public class Gala.DBus {
+ #endif
+ 
+         Bus.own_name (
+-            SESSION, "org.pantheon.gala", NONE, null,
++            SESSION, "io.elementary.gala", NONE, null,
+             (connection, name) => {
+                 if (instance == null) {
+                     instance = new DBus ();
+                 }
+ 
+                 try {
+-                    connection.register_object ("/org/pantheon/gala", instance);
+-                    connection.register_object ("/org/pantheon/gala/DesktopInterface", new DesktopIntegration (wm, window_overview));
++                    connection.register_object ("/io/elementary/gala", WindowDragProvider.get_instance ());
++                    connection.register_object ("/io/elementary/gala", instance);
++                    connection.register_object ("/io/elementary/gala/DesktopInterface", new DesktopIntegration (wm, window_overview));
+                 } catch (Error e) {
+                     warning (e.message);
+                 }
+diff --git a/src/Misc/DaemonManager.vala b/src/Misc/DaemonManager.vala
+index 62e67ee..990bd31 100644
+--- a/src/Misc/DaemonManager.vala
++++ b/src/Misc/DaemonManager.vala
+@@ -6,11 +6,11 @@
+  */
+ 
+ public class Gala.DaemonManager : GLib.Object {
+-    private const string DAEMON_DBUS_NAME = "org.pantheon.gala.daemon";
+-    private const string DAEMON_DBUS_OBJECT_PATH = "/org/pantheon/gala/daemon";
++    private const string DAEMON_DBUS_NAME = "io.elementary.gala.daemon";
++    private const string DAEMON_DBUS_OBJECT_PATH = "/io/elementary/gala/daemon";
+     private const int SPACING = 12;
+ 
+-    [DBus (name = "org.pantheon.gala.daemon")]
++    [DBus (name = "io.elementary.gala.daemon")]
+     public interface Daemon: GLib.Object {
+         public abstract async void show_window_menu (int width, int height, int x, int y) throws Error;
+         public abstract async void show_desktop_menu (int display_width, int display_height, int x, int y) throws Error;
+diff --git a/src/Misc/DesktopIntegration.vala b/src/Misc/DesktopIntegration.vala
+index f6cd244..74ba87f 100644
+--- a/src/Misc/DesktopIntegration.vala
++++ b/src/Misc/DesktopIntegration.vala
+@@ -4,7 +4,7 @@
+  * SPDX-License-Identifier: GPL-3.0-or-later
+  */
+ 
+-[DBus (name="org.pantheon.gala.DesktopIntegration")]
++[DBus (name="io.elementary.gala.DesktopIntegration")]
+ public class Gala.DesktopIntegration : GLib.Object {
+     public struct RunningApplication {
+         string app_id;
+diff --git a/src/WindowManager.vala b/src/WindowManager.vala
+index 62acd99..f48873f 100644
+--- a/src/WindowManager.vala
++++ b/src/WindowManager.vala
+@@ -30,7 +30,7 @@ namespace Gala {
+             }
+         }
+ 
+-        private const string OPEN_MULTITASKING_VIEW = "dbus-send --session --dest=org.pantheon.gala --print-reply /org/pantheon/gala org.pantheon.gala.PerformAction int32:1";
++        private const string OPEN_MULTITASKING_VIEW = "dbus-send --session --dest=io.elementary.gala --print-reply /io/elementary/gala io.elementary.gala.PerformAction int32:1";
+         private const string OPEN_APPLICATIONS_MENU = "io.elementary.wingpanel --toggle-indicator=app-launcher";
+ 
+         /**

@@ -9,22 +9,23 @@
   vala,
   gtk4,
   glib,
-  granite7,
+  granite9,
   libadwaita,
   libgee,
   wrapGAppsHook4,
   appstream,
 }:
 
-stdenv.mkDerivation rec {
+stdenv.mkDerivation {
   pname = "elementary-feedback";
-  version = "8.1.1";
+  version = "8.1.1-unstable-2026-11-06";
 
+  # nixpkgs-update: no auto update
   src = fetchFromGitHub {
     owner = "elementary";
     repo = "feedback";
-    tag = version;
-    hash = "sha256-vg692o0OkEQqtKSLZDLztL/D0YO5WUOBVKe4RDxSEFM=";
+    rev = "57ff400e9f01d3ce2b69b01625328a4e9fff6889";
+    hash = "sha256-ee0+pNueGQGAOnOU0bBOR41Xcd3gcBnEgOS5ARgVpj8=";
   };
 
   patches = [
@@ -45,7 +46,7 @@ stdenv.mkDerivation rec {
 
   buildInputs = [
     appstream
-    granite7
+    granite9
     gtk4
     libadwaita
     libgee

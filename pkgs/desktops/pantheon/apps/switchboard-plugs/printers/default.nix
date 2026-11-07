@@ -16,15 +16,16 @@
   switchboard,
 }:
 
-stdenv.mkDerivation rec {
+stdenv.mkDerivation {
   pname = "switchboard-plug-printers";
-  version = "8.0.2";
+  version = "8.0.2-unstable-2026-10-24";
 
+  # nixpkgs-update: no auto update
   src = fetchFromGitHub {
     owner = "elementary";
     repo = "settings-printers";
-    tag = version;
-    hash = "sha256-oqdmARZamTbMwpKKmyVZflYLCd0Qf5iE5lHSMfdPGA8=";
+    rev = "7c1208ba37e7c7303e62b30dfabddaac57e5084d";
+    hash = "sha256-uSC6H1uEh0Y7y0vkhMyennWVtGjwjbT+vCmcbTElq5g=";
   };
 
   nativeBuildInputs = [
@@ -55,5 +56,4 @@ stdenv.mkDerivation rec {
     platforms = lib.platforms.linux;
     teams = [ lib.teams.pantheon ];
   };
-
 }

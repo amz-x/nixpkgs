@@ -2,6 +2,7 @@
   lib,
   stdenv,
   fetchFromGitHub,
+  fetchpatch,
   nix-update-script,
   meson,
   ninja,
@@ -24,15 +25,16 @@
   wrapGAppsHook3,
 }:
 
-stdenv.mkDerivation rec {
+stdenv.mkDerivation {
   pname = "elementary-photos";
-  version = "8.0.2";
+  version = "8.0.2-unstable-2026-11-05";
 
+  # nixpkgs-update: no auto update
   src = fetchFromGitHub {
     owner = "elementary";
     repo = "photos";
-    rev = version;
-    hash = "sha256-weJ061ofCwOzq5gFRNxoW1GgSkEkr68cBNbyBfgCECc=";
+    rev = "f8b50e333fb5e78bd6e52ceeade83e573de42f29";
+    hash = "sha256-IUgU4i/I7x2w3vEOgwMnf3GzU2Y7wBGH3F6e8j6rgrI=";
   };
 
   nativeBuildInputs = [

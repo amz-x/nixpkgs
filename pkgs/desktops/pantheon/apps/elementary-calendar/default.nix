@@ -7,30 +7,30 @@
   ninja,
   pkg-config,
   vala,
-  wrapGAppsHook3,
-  clutter,
-  evolution-data-server,
+  wrapGAppsHook4,
+  evolution-data-server-gtk4,
   folks,
   geoclue2,
   geocode-glib_2,
-  granite,
-  gtk3,
-  libchamplain_libsoup3,
+  granite7,
+  gtk4,
+  libadwaita,
   libgee,
-  libhandy,
   libical,
-  libportal-gtk3,
+  libportal-gtk4,
+  libshumate,
 }:
 
-stdenv.mkDerivation rec {
+stdenv.mkDerivation {
   pname = "elementary-calendar";
-  version = "8.0.2";
+  version = "8.0.2-unstable-2026-11-04";
 
+  # nixpkgs-update: no auto update
   src = fetchFromGitHub {
     owner = "elementary";
     repo = "calendar";
-    tag = version;
-    hash = "sha256-YFO+tMJsidp5Tq8mAobdc1VBHR2DuMJlEnwSg+mVScM=";
+    rev = "97de059e9ce4ff82e90c322cafba40796b81c64c";
+    hash = "sha256-VGcRPj826ta7yLyeF82RwZwAdQVnccrnLSeesUYluoM=";
   };
 
   nativeBuildInputs = [
@@ -38,22 +38,21 @@ stdenv.mkDerivation rec {
     ninja
     pkg-config
     vala
-    wrapGAppsHook3
+    wrapGAppsHook4
   ];
 
   buildInputs = [
-    clutter
-    evolution-data-server
+    evolution-data-server-gtk4
     folks
     geoclue2
     geocode-glib_2
-    granite
-    gtk3
-    libchamplain_libsoup3
+    granite7
+    gtk4
+    libadwaita
     libgee
-    libhandy
     libical
-    libportal-gtk3
+    libportal-gtk4
+    libshumate
   ];
 
   passthru = {
