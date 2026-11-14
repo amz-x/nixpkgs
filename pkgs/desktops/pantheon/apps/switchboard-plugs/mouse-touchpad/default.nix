@@ -22,16 +22,18 @@
 
 stdenv.mkDerivation rec {
   pname = "switchboard-plug-mouse-touchpad";
-  version = "8.1.0";
+  version = "8.1.0-unstable-2026-11-13";
 
+  # nixpkgs-update: no auto update
   src = fetchFromGitHub {
     owner = "elementary";
     repo = "settings-mouse-touchpad";
-    tag = version;
-    hash = "sha256-KfaC1yfsL3GowcjqqwPpYQ6DJIoO7ejl0y3IQ4Gtdj8=";
+    rev = "fd759322ada647570d1920b55a7a9eff214046b6";
+    hash = "sha256-tn13YQbiuZOwF2qoNOiLeInp8zlKQmC5siECA5SZVUY=";
   };
 
   patches = [
+    # Read the default touchegg.conf from the store rather than /usr/share
     (replaceVars ./fix-paths.patch {
       touchegg = touchegg;
     })

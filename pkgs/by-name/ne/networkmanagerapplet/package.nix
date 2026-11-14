@@ -34,6 +34,12 @@ stdenv.mkDerivation rec {
     sha256 = "sha256-qEcESH6jr+FIXEf7KrWYuPd59UCuDcvwocX4XmSn4lM=";
   };
 
+  patches = [
+    # WireGuard is built into NetworkManager rather than a VPN plugin, so
+    # `nm-connection-editor --create --type=vpn` left it out of the type list.
+    ./feature-add-wireguard-to-vpn-type-dialog.patch
+  ];
+
   mesonFlags = [
     "-Dselinux=false"
     "-Dappindicator=yes"

@@ -87,10 +87,13 @@ pythonPackages.buildPythonApplication rec {
       gst-python
       opencv4
       zstandard
+      pandas
       pythonPackages.ollama
     ]
     ++ markitdown.optional-dependencies.pptx
     ++ markitdown.optional-dependencies.docx
+    ++ markitdown.optional-dependencies.xlsx
+    ++ markitdown.optional-dependencies.xls
     ++ markitdown.optional-dependencies.pdf
     ++ markitdown.optional-dependencies.youtube-transcription
     ++ lib.concatAttrValues optional-dependencies;

@@ -1,0 +1,77 @@
+diff --git a/lib/Effects/BackgroundBlurEffect.vala b/lib/Effects/BackgroundBlurEffect.vala
+index 53c0479f..74125dc1 100644
+--- a/lib/Effects/BackgroundBlurEffect.vala
++++ b/lib/Effects/BackgroundBlurEffect.vala
+@@ -6,7 +6,6 @@
+ public class Gala.BackgroundBlurEffect : Clutter.Effect {
+     private const float MIN_DOWNSCALE_SIZE = 256.0f;
+     private const float MAX_RADIUS = 12.0f;
+-    private const int FORCE_REFRESH_FRAMES = 2;
+ 
+     public float blur_radius { get; construct; }
+     public float clip_radius { get; construct; }
+@@ -28,7 +27,6 @@ public class Gala.BackgroundBlurEffect : Clutter.Effect {
+     private int round_clip_radius_location;
+     private int round_actor_size_location;
+ 
+-    private int frame_counter = 0;
+     private float last_box_scale_factor = 1.0f;
+ 
+     public BackgroundBlurEffect (float blur_radius, float clip_radius, float monitor_scale) {
+@@ -379,14 +377,50 @@ public class Gala.BackgroundBlurEffect : Clutter.Effect {
+         add_actor_node (node);
+     }
+ 
+-    public override void paint (Clutter.PaintNode node, Clutter.PaintContext paint_context, Clutter.EffectPaintFlags flags) {
+-        if (frame_counter == 0) {
+-            frame_counter = FORCE_REFRESH_FRAMES;
+-            queue_repaint ();
+-        } else {
+-            frame_counter--;
++    /**
++     * The blur samples the framebuffer beneath the whole actor, but outside of the
++     * redraw clip that still holds the previous frame, including the actor itself.
++     * So after a partial repaint the blur is stale and the whole actor needs to be
++     * repainted once.
++     */
++    private bool is_partial_repaint (Clutter.PaintContext paint_context) {
++        unowned var stage_view = paint_context.get_stage_view ();
++        if (stage_view == null || actor.is_in_clone_paint ()) {
++            return false;
+         }
+ 
++        unowned var redraw_clip = paint_context.get_redraw_clip ();
++        if (redraw_clip == null) {
++            return false;
++        }
++
++        Mtk.Rectangle view_layout = {};
++        stage_view.get_layout (ref view_layout);
++
++        // Round inwards: the damage of a full repaint is rounded outwards
++        var extents = actor.get_transformed_extents ();
++        var x1 = (int) Math.ceilf (extents.get_x ());
++        var y1 = (int) Math.ceilf (extents.get_y ());
++        var x2 = (int) Math.floorf (extents.get_x () + extents.get_width ());
++        var y2 = (int) Math.floorf (extents.get_y () + extents.get_height ());
++
++        if (x2 <= x1 || y2 <= y1) {
++            return false;
++        }
++
++        Mtk.Rectangle actor_rect;
++        if (!view_layout.intersect ({ x1, y1, x2 - x1, y2 - y1 }, out actor_rect)) {
++            return false;
++        }
++
++        return redraw_clip.contains_rectangle (actor_rect) != IN;
++    }
++
++    public override void paint (Clutter.PaintNode node, Clutter.PaintContext paint_context, Clutter.EffectPaintFlags flags) {
+         base.paint (node, paint_context, flags);
++
++        if (is_partial_repaint (paint_context)) {
++            queue_repaint ();
++        }
+     }
+ }

@@ -1,0 +1,79 @@
+diff --git a/src/Views/AppInfoView.vala b/src/Views/AppInfoView.vala
+index 669acfe..4a499a4 100644
+--- a/src/Views/AppInfoView.vala
++++ b/src/Views/AppInfoView.vala
+@@ -41,6 +41,10 @@ public class AppCenter.Views.AppInfoView : Adw.NavigationPage {
+     private Widgets.SizeLabel size_label;
+     private ArrowButton screenshot_next;
+     private ArrowButton screenshot_previous;
++    private Gtk.Revealer screenshot_arrow_revealer_n;
++    private Gtk.Revealer screenshot_arrow_revealer_p;
++    private Gtk.Revealer title_revealer;
++    private Gtk.Box header;
+     private Gtk.FlowBox oars_flowbox;
+     private Gtk.Revealer oars_flowbox_revealer;
+     private Gtk.Revealer uninstall_button_revealer;
+@@ -75,7 +79,7 @@ public class AppCenter.Views.AppInfoView : Adw.NavigationPage {
+         title_widget.append (title_label);
+         title_widget.add_css_class (Granite.STYLE_CLASS_TITLE_LABEL);
+ 
+-        var title_revealer = new Gtk.Revealer () {
++        title_revealer = new Gtk.Revealer () {
+             child = title_widget,
+             transition_type = CROSSFADE
+         };
+@@ -191,7 +195,7 @@ public class AppCenter.Views.AppInfoView : Adw.NavigationPage {
+             maximum_size = MAX_WIDTH
+         };
+ 
+-        var header = new Gtk.Box (HORIZONTAL, 0) {
++        header = new Gtk.Box (HORIZONTAL, 0) {
+             hexpand = true
+         };
+         header.append (header_clamp);
+@@ -554,14 +558,14 @@ public class AppCenter.Views.AppInfoView : Adw.NavigationPage {
+                 }
+             });
+ 
+-            var screenshot_arrow_revealer_p = new Gtk.Revealer () {
++            screenshot_arrow_revealer_p = new Gtk.Revealer () {
+                 child = screenshot_previous,
+                 halign = Gtk.Align.START,
+                 valign = Gtk.Align.CENTER,
+                 transition_type = Gtk.RevealerTransitionType.CROSSFADE
+             };
+ 
+-            var screenshot_arrow_revealer_n = new Gtk.Revealer () {
++            screenshot_arrow_revealer_n = new Gtk.Revealer () {
+                 child = screenshot_next,
+                 halign = Gtk.Align.END,
+                 valign = Gtk.Align.CENTER,
+@@ -692,8 +696,8 @@ public class AppCenter.Views.AppInfoView : Adw.NavigationPage {
+         package.notify["state"].connect (on_package_state_changed);
+         on_package_state_changed ();
+ 
+-        scrolled.vadjustment.value_changed.connect (() => {
+-           title_revealer.reveal_child = scrolled.vadjustment.value > header.get_height ();
++        scrolled.vadjustment.value_changed.connect ((adjustment) => {
++           title_revealer.reveal_child = adjustment.value > header.get_height ();
+         });
+ 
+         if (oars_flowbox.get_first_child () != null) {
+diff --git a/src/Widgets/BackButton.vala b/src/Widgets/BackButton.vala
+index 9de8f48..a9d9e4a 100644
+--- a/src/Widgets/BackButton.vala
++++ b/src/Widgets/BackButton.vala
+@@ -4,10 +4,12 @@
+  */
+ 
+ public class AppCenter.BackButton : Gtk.Button {
++    private Gtk.Label label_widget;
++
+     construct {
+         var back_icon = new Gtk.Image.from_icon_name ("go-previous-symbolic");
+ 
+-        var label_widget = new Gtk.Label ("") {
++        label_widget = new Gtk.Label ("") {
+             mnemonic_widget = this
+         };
+ 

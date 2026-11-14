@@ -1,0 +1,71 @@
+diff --git a/src/Indicator.vala b/src/Indicator.vala
+index 8347702..3555773 100644
+--- a/src/Indicator.vala
++++ b/src/Indicator.vala
+@@ -108,6 +108,8 @@ public class Notifications.Indicator : Wingpanel.Indicator {
+             });
+ 
+             dynamic_icon.add_controller (gesture_click);
++
++            set_display_icon_name ();
+         }
+ 
+         return dynamic_icon;
+diff --git a/src/Widgets/Symbol.vala b/src/Widgets/Symbol.vala
+index 954111d..610d902 100644
+--- a/src/Widgets/Symbol.vala
++++ b/src/Widgets/Symbol.vala
+@@ -21,7 +21,7 @@ public class NotificationsIndicator.Symbol : Granite.Bin {
+     }
+ 
+     public uint state_index {
+-        get { return svg.state; }
++        get { return svg_playing ? svg.state : pending_state; }
+         set {
+             uint length = -1;
+             svg.get_state_names (out length);
+@@ -31,7 +31,14 @@ public class NotificationsIndicator.Symbol : Granite.Bin {
+                 return;
+             }
+ 
+-            svg.state = value;
++            // State-triggered animations are only scheduled once the svg has
++            // a frame clock, so hold the state until then
++            if (!svg_playing) {
++                pending_state = value;
++            } else {
++                svg.state = value;
++            }
++
+             notify_property ("state");
+         }
+     }
+@@ -58,6 +65,8 @@ public class NotificationsIndicator.Symbol : Granite.Bin {
+ 
+     private Gtk.Image image;
+     private Gtk.Svg svg;
++    private bool svg_playing = false;
++    private uint pending_state;
+ 
+     public Symbol (string resource_path) {
+         Object (resource_path: resource_path);
+@@ -65,6 +74,7 @@ public class NotificationsIndicator.Symbol : Granite.Bin {
+ 
+     construct {
+         svg = new Gtk.Svg.from_resource (resource_path);
++        pending_state = svg.state;
+ 
+         image = new Gtk.Image.from_paintable (svg);
+ 
+@@ -73,6 +83,11 @@ public class NotificationsIndicator.Symbol : Granite.Bin {
+         child.realize.connect (() => {
+             svg.set_frame_clock (get_frame_clock ());
+             svg.play ();
++
++            if (!svg_playing) {
++                svg_playing = true;
++                svg.state = pending_state;
++            }
+         });
+     }
+ }

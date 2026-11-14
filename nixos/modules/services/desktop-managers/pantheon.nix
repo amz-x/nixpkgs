@@ -107,9 +107,12 @@ in
 
   config = mkMerge [
     (mkIf cfg.enable {
-      services.desktopManager.pantheon.sessionPath = utils.removePackagesByName [
-        pkgs.pantheon.pantheon-agent-geoclue2
-      ] config.environment.pantheon.excludePackages;
+      services.desktopManager.pantheon.sessionPath =
+        utils.removePackagesByName [
+          pkgs.pantheon.pantheon-agent-geoclue2
+        ] config.environment.pantheon.excludePackages
+        # The Sharing settings only offer Remote Desktop when its GSettings schema is found.
+        ++ optional config.services.gnome.gnome-remote-desktop.enable pkgs.gnome-remote-desktop;
 
       services.displayManager.sessionPackages = [ pkgs.pantheon.elementary-session-settings ];
 
@@ -147,6 +150,9 @@ in
 
       # Default services
       hardware.bluetooth.enable = mkDefault true;
+      # Used by gala, the keyboard indicator and the keyboard plug
+      i18n.inputMethod.enable = mkDefault true;
+      i18n.inputMethod.type = mkDefault "ibus";
       security.polkit.enable = true;
       services.accounts-daemon.enable = true;
       services.colord.enable = mkDefault true;
@@ -195,6 +201,7 @@ in
         gnome-session
         pantheon.gala
         pantheon.gnome-settings-daemon
+        pantheon.elementary-bluetooth-daemon
         pantheon.elementary-session-settings
         pantheon.elementary-settings-daemon
         pantheon.pantheon-agent-polkit
@@ -218,6 +225,13 @@ in
 
       systemd.user.services."io.elementary.desktop.agent-polkit" = {
         # Same as above.
+        wantedBy = [ "gnome-session-initialized.target" ];
+        environment.PATH = lib.mkForce null;
+      };
+
+      # The panel indicator only writes the GSettings key, this daemon
+      # applies it to the adapters.
+      systemd.user.services."io.elementary.bluetooth" = {
         wantedBy = [ "gnome-session-initialized.target" ];
         environment.PATH = lib.mkForce null;
       };
@@ -324,6 +338,7 @@ in
     })
 
     (mkIf serviceCfg.apps.enable {
+
       environment.systemPackages = utils.removePackagesByName (
         [
           pkgs.epiphany
@@ -383,6 +398,11 @@ in
       services.dbus.packages = [ pkgs.pantheon.switchboard-plug-parental-controls ];
 
       systemd.packages = [ pkgs.pantheon.switchboard-plug-parental-controls ];
+
+      # Replaces the XDG autostart file since elementary/switchboard-plug-parental-controls#217.
+      systemd.user.services."pantheon-parental-controls-client" = {
+        wantedBy = [ "gnome-session-initialized.target" ];
+      };
     })
   ];
 }

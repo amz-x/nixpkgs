@@ -1,0 +1,28 @@
+diff --git a/src/Widgets/Player/SettingsPopover.vala b/src/Widgets/Player/SettingsPopover.vala
+index 0b4a2c89..bdb85da8 100644
+--- a/src/Widgets/Player/SettingsPopover.vala
++++ b/src/Widgets/Player/SettingsPopover.vala
+@@ -89,6 +89,10 @@ public class Audience.Widgets.SettingsPopover : Gtk.Popover {
+ 
+         languages.changed.connect (on_languages_changed);
+ 
++        // Prevent breaking autohide by closing popover
++        languages.notify["popup-shown"].connect (on_combobox_popup_shown);
++        subtitles.notify["popup-shown"].connect (on_combobox_popup_shown);
++
+         map.connect (() => {
+             setup ();
+         });
+@@ -146,6 +150,12 @@ public class Audience.Widgets.SettingsPopover : Gtk.Popover {
+         }
+     }
+ 
++    private void on_combobox_popup_shown (Object obj, ParamSpec pspec) {
++        if (!((Gtk.ComboBox) obj).popup_shown) {
++            popdown ();
++        }
++    }
++
+     private void on_subtitles_changed () {
+         if (subtitles.active < 0) {
+             return;

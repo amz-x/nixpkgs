@@ -1,0 +1,23 @@
+diff --git a/src/Backends/ApplicationShortcuts.vala b/src/Backends/ApplicationShortcuts.vala
+index 94df821..ec13a4d 100644
+--- a/src/Backends/ApplicationShortcuts.vala
++++ b/src/Backends/ApplicationShortcuts.vala
+@@ -68,7 +68,7 @@ public class SettingsDaemon.Backends.ApplicationShortcuts : Object {
+ 
+         Bus.get_proxy.begin<DesktopIntegration> (
+             BusType.SESSION,
+-            "org.pantheon.gala", "/org/pantheon/gala/DesktopInterface",
++            "io.elementary.gala", "/io/elementary/gala/DesktopInterface",
+             NONE, null,
+             (obj, res) => {
+                 try {
+diff --git a/src/DBus/DesktopIntegration.vala b/src/DBus/DesktopIntegration.vala
+index a7157f8..cd50804 100644
+--- a/src/DBus/DesktopIntegration.vala
++++ b/src/DBus/DesktopIntegration.vala
+@@ -1,4 +1,4 @@
+-[DBus (name="org.pantheon.gala.DesktopIntegration")]
++[DBus (name="io.elementary.gala.DesktopIntegration")]
+ public interface DesktopIntegration : GLib.Object {
+     public struct RunningApplication {
+         string app_id;

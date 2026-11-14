@@ -13,7 +13,6 @@
   unstableGitUpdater,
 
   # fwupd
-  fetchpatch2,
   pkg-config,
   pkgsBuildBuild,
 

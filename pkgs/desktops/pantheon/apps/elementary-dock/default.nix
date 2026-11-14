@@ -18,19 +18,45 @@
 
 stdenv.mkDerivation (finalAttrs: {
   pname = "elementary-dock";
-  version = "8.3.3";
+  version = "8.3.3-unstable-2026-11-13";
 
   outputs = [
     "out"
     "dev"
   ];
 
+  # nixpkgs-update: no auto update
   src = fetchFromGitHub {
     owner = "elementary";
     repo = "dock";
-    rev = finalAttrs.version;
-    hash = "sha256-13wXBqN4vovmiXXQyciy4yxIrByuLBvm+ypg2MLVMB4=";
+    rev = "c75236fcd98dc26aa90f32f841aa1d18679f453c";
+    hash = "sha256-1lJUW8OuHlInNCx2il9NfTI3OZ3Rva1Fx/MoUQRS0eI=";
   };
+
+  patches = [
+    # Launcher: new context option to close all windows
+    # https://github.com/elementary/dock/pull/344 (needs gala#2202)
+    # Rebased: the PR targets files that have since moved and been reworked
+    # (menu built in Launcher, desktop integration owned by WindowSystem).
+    ./feature-close-all-windows.patch
+
+    # Follow gala's D-Bus rename to io.elementary.gala
+    # https://github.com/elementary/gala/pull/2046
+    ./feature-gala-rdnn-dbus.patch
+
+    # Launch applications inside a Systemd scope
+    # https://github.com/elementary/dock/pull/464
+    # Reworked to address review: D-Bus activated apps report pid 0 (the
+    # lookup never fails), async D-Bus calls, also cover middle-click launches.
+    ./feature-systemd-scope.patch
+
+    # Upstream bug from 7db0fd51 ("Introduce AnimatableWidget and use
+    # Adw.PropertyAnimationTarget"): AnimatableWidget allocated itself from its
+    # property setters, outside the layout pass, so animations starting before
+    # the first layout allocated 0x0 and spammed allocation warnings; allocate
+    # the child with the transform in size_allocate () instead
+    ./fix-animatable-widget-allocation.patch
+  ];
 
   depsBuildBuild = [ pkg-config ];
 

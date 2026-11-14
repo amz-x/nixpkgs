@@ -1,0 +1,476 @@
+diff --git a/src/DBus.vala b/src/DBus.vala
+index 5541df51c..9ff0aa09a 100644
+--- a/src/DBus.vala
++++ b/src/DBus.vala
+@@ -29,6 +29,34 @@ public class Gala.DBus {
+             on_name_lost
+         );
+ 
++#if HAS_MUTTER50
++        var brightness_manager = new BrightnessManager (wm.get_display ());
++
++        Bus.own_name (
++            SESSION, "io.elementary.gala.BrightnessManager", NONE, null,
++            (connection, name) => {
++                try {
++                    connection.register_object ("/io/elementary/gala/BrightnessManager", brightness_manager);
++                } catch (Error e) {
++                    warning (e.message);
++                }
++            },
++            on_name_lost
++        );
++
++        Bus.own_name (
++            SESSION, "org.gnome.Shell.Brightness", NONE, null,
++            (connection, name) => {
++                try {
++                    connection.register_object ("/org/gnome/Shell/Brightness", new GSDBrightnessAdapter (brightness_manager));
++                } catch (Error e) {
++                    warning (e.message);
++                }
++            },
++            on_name_lost
++        );
++#endif
++
+         Bus.own_name (
+             SESSION, "org.pantheon.gala", NONE, null,
+             (connection, name) => {
+diff --git a/src/Misc/Brightness/BrightnessManager.vala b/src/Misc/Brightness/BrightnessManager.vala
+new file mode 100644
+index 000000000..38bfbe2e2
+--- /dev/null
++++ b/src/Misc/Brightness/BrightnessManager.vala
+@@ -0,0 +1,159 @@
++/*
++ * Copyright 2026 elementary, Inc. (https://elementary.io)
++ * SPDX-License-Identifier: GPL-3.0-or-later
++ *
++ * Authored by: Leonhard Kargl <leo.kargl@proton.me>
++ */
++
++#if HAS_MUTTER50
++[DBus (name = "io.elementary.gala.BrightnessManager")]
++public class Gala.BrightnessManager : Object {
++    /**
++     * The monitors changed, you should treat everything as invalid
++     * and re-query the number of monitors and their brightness.
++     */
++    public signal void monitors_changed ();
++
++    /**
++     * The brightness of the monitor with the given index changed.
++     * Note that this might change the global brightness so it should
++     * be re-queried as well.
++     */
++    public signal void monitor_brightness_changed (int index, double brightness);
++
++    [DBus (visible = false)]
++    public Meta.Display display { private get; construct; }
++
++    public bool dimming_enabled { get; set; default = false; }
++    public double auto_brightness_target { get; set; default = -1; }
++
++    private Gee.ArrayList<MonitorBrightness> supported_monitors;
++
++    [DBus (visible = false)]
++    public BrightnessManager (Meta.Display display) {
++        Object (display: display);
++    }
++
++    construct {
++        supported_monitors = new Gee.ArrayList<MonitorBrightness> ();
++
++        var monitor_manager = display.get_context ().get_backend ().get_monitor_manager ();
++        monitor_manager.monitors_changed.connect (update_monitors);
++        update_monitors ();
++    }
++
++    private void update_monitors () {
++        supported_monitors.clear ();
++
++        var monitor_manager = display.get_context ().get_backend ().get_monitor_manager ();
++        unowned var logical_monitors = monitor_manager.get_logical_monitors ();
++
++        foreach (var logical_monitor in logical_monitors) {
++            bool has_primary = false;
++            bool has_backlight = false;
++            foreach (var monitor in logical_monitor.get_monitors ()) {
++                if (monitor.is_primary ()) {
++                    has_primary = true;
++                }
++
++                if (monitor.get_backlight () != null && monitor.is_active ()) {
++                    has_backlight = true;
++                }
++            }
++
++            if (!has_backlight) {
++                continue;
++            }
++
++            var brightness = new MonitorBrightness (logical_monitor, supported_monitors.size);
++            brightness.notify["value"].connect (on_brightness_changed);
++
++            bind_property ("dimming-enabled", brightness, "dimming-enabled", SYNC_CREATE);
++            bind_property ("auto-brightness-target", brightness, "auto-brightness-target", SYNC_CREATE);
++
++            if (has_primary) {
++                supported_monitors.insert (0, brightness);
++            } else {
++                supported_monitors.add (brightness);
++            }
++        }
++
++        monitors_changed ();
++    }
++
++    private void on_brightness_changed (Object obj, ParamSpec pspec) {
++        var brightness = (MonitorBrightness) obj;
++        monitor_brightness_changed (brightness.index, brightness.value);
++    }
++
++    public int get_n_monitors () throws IOError, DBusError {
++        return supported_monitors.size;
++    }
++
++    public string get_monitor_name (int index) throws IOError, DBusError {
++        if (index < 0 || index >= supported_monitors.size) {
++            throw new IOError.INVALID_ARGUMENT ("Invalid monitor index: %d".printf (index));
++        }
++
++        return supported_monitors[index].name;
++    }
++
++    public double get_monitor_brightness (int index) throws IOError, DBusError {
++        if (index < 0 || index >= supported_monitors.size) {
++            throw new IOError.INVALID_ARGUMENT ("Invalid monitor index: %d".printf (index));
++        }
++
++        return supported_monitors[index].value;
++    }
++
++    public void set_monitor_brightness (int index, double brightness) throws IOError, DBusError {
++        if (index < 0 || index >= supported_monitors.size) {
++            throw new IOError.INVALID_ARGUMENT ("Invalid monitor index: %d".printf (index));
++        }
++
++        if (brightness < 0.0 || brightness > 1.0) {
++            throw new IOError.INVALID_ARGUMENT ("Invalid brightness value: %f".printf (brightness));
++        }
++
++        supported_monitors[index].value = brightness;
++    }
++
++    /**
++     * Gets the percentage that represents the "global" brightness.
++     * This is currently the maximum brightness of all monitors.
++     * See {@link set_global_brightness} for more information.
++     */
++    public double get_global_brightness () throws IOError, DBusError {
++        if (supported_monitors.size == 0) {
++            throw new IOError.INVALID_ARGUMENT ("No supported monitors found.");
++        }
++
++        var max = supported_monitors.max (MonitorBrightness.brightness_compare_func);
++        return max.value;
++    }
++
++    /**
++     * Sets a new "global" brightness.
++     * This will adjust the brightness of all monitors in a way that
++     * their relative brightness is kept.
++     */
++    public void set_global_brightness (double scale) throws IOError, DBusError {
++        if (supported_monitors.size == 0) {
++            throw new IOError.INVALID_ARGUMENT ("No supported monitors found.");
++        }
++
++        if (scale < 0.0 || scale > 1.0) {
++            throw new IOError.INVALID_ARGUMENT ("Invalid scale value: %f".printf (scale));
++        }
++
++        /* Make sure we don't divide by zero */
++        var max = double.max (get_global_brightness (), 0.01);
++
++        foreach (var monitor in supported_monitors) {
++            /* Make sure we don't get trapped at zero */
++            var monitor_val = double.max (monitor.value, 0.01);
++            monitor.value = (monitor_val / max) * scale;
++        }
++    }
++}
++#endif
+diff --git a/src/Misc/Brightness/GSDBrightnessAdapter.vala b/src/Misc/Brightness/GSDBrightnessAdapter.vala
+new file mode 100644
+index 000000000..b53963f5e
+--- /dev/null
++++ b/src/Misc/Brightness/GSDBrightnessAdapter.vala
+@@ -0,0 +1,56 @@
++/*
++ * Copyright 2026 elementary, Inc. (https://elementary.io)
++ * SPDX-License-Identifier: GPL-3.0-or-later
++ *
++ * Authored by: Leonhard Kargl <leo.kargl@proton.me>
++ */
++
++#if HAS_MUTTER50
++/**
++ * Implements the interface that the gnome settings daemon
++ * expects from gnome shell for things like dimming on idle and
++ * auto brightness.
++ * See: [[https://gitlab.gnome.org/GNOME/gnome-shell/-/blob/main/data/dbus-interfaces/org.gnome.Shell.Brightness.xml]]
++ */
++[DBus (name = "org.gnome.Shell.Brightness")]
++public class Gala.GSDBrightnessAdapter : Object {
++    public signal void brightness_changed ();
++
++    [DBus (visible = false)]
++    public BrightnessManager brightness_manager { private get; construct; }
++
++    public bool has_brightness_control { get; private set; }
++
++    public GSDBrightnessAdapter (BrightnessManager brightness_manager) {
++        Object (brightness_manager: brightness_manager);
++    }
++
++    construct {
++        brightness_manager.monitors_changed.connect (on_monitors_changed);
++        on_monitors_changed ();
++
++        brightness_manager.monitor_brightness_changed.connect (on_monitor_brightness_changed);
++    }
++
++    private void on_monitors_changed () {
++        try {
++            has_brightness_control = brightness_manager.get_n_monitors () > 0;
++        } catch (Error e) {
++            warning ("Failed to query number of monitors: %s", e.message);
++            has_brightness_control = false;
++        }
++    }
++
++    private void on_monitor_brightness_changed () {
++        brightness_changed ();
++    }
++
++    public void set_dimming (bool enable) throws DBusError, IOError {
++        brightness_manager.dimming_enabled = enable;
++    }
++
++    public void set_auto_brightness_target (double target) throws DBusError, IOError {
++        brightness_manager.auto_brightness_target = target;
++    }
++}
++#endif
+diff --git a/src/Misc/Brightness/MonitorBrightness.vala b/src/Misc/Brightness/MonitorBrightness.vala
+new file mode 100644
+index 000000000..f71eb3c1b
+--- /dev/null
++++ b/src/Misc/Brightness/MonitorBrightness.vala
+@@ -0,0 +1,132 @@
++/*
++ * Copyright 2026 elementary, Inc. (https://elementary.io)
++ * SPDX-License-Identifier: GPL-3.0-or-later
++ *
++ * Authored by: Leonhard Kargl <leo.kargl@proton.me>
++ */
++
++#if HAS_MUTTER50
++public class Gala.MonitorBrightness : Object {
++    private const string DIMMING_SCHEMA_ID = "org.gnome.settings-daemon.plugins.power";
++
++    // This is really hacky. This causes vala to first include meta/display.h which includes
++    // the file with the necessary macros that are used in meta/meta-logical-monitor.h and meta/meta-monitor.h
++    // but not included there. I will upstream fixes for this but for now make it compile
++    public Meta.Display display;
++
++    public Meta.LogicalMonitor logical_monitor { private get; construct; }
++    public int index { get; construct; }
++
++    public string name { get; private set; }
++
++    /**
++     * The brightness of all physical monitors in percent (0.0 - 1.0). This might
++     * sometimes not actually match the monitors actual brightness, e.g. when it gets dimmed
++     * because the system is idle, or when an auto target is enabled.
++     */
++    public double value { get; set; default = -1; }
++
++    public bool dimming_enabled { get; set; default = false; }
++    public double auto_brightness_target { get; set; default = -1; }
++
++    private static Settings? dimming_settings;
++
++    private Gee.ArrayList<Meta.Backlight> backlights;
++    private bool writing_backlights = false;
++
++    public MonitorBrightness (Meta.LogicalMonitor logical_monitor, int index) {
++        Object (logical_monitor: logical_monitor, index: index);
++    }
++
++    static construct {
++        if (SettingsSchemaSource.get_default ().lookup (DIMMING_SCHEMA_ID, true) != null) {
++            dimming_settings = new Settings (DIMMING_SCHEMA_ID);
++        }
++    }
++
++    construct {
++        backlights = new Gee.ArrayList<Meta.Backlight> ();
++
++        unowned var monitors = logical_monitor.get_monitors ();
++
++        name = monitors.first ().data.get_display_name ();
++
++        foreach (var monitor in monitors) {
++            var backlight = monitor.get_backlight ();
++            if (backlight == null || !monitor.is_active ()) {
++                continue;
++            }
++
++            if (value == -1) {
++                value = get_relative_brightness (backlight);
++            }
++
++            set_relative_brightness (backlight, value);
++            backlights.add (backlight);
++            backlight.notify["brightness"].connect (on_brightness_changed);
++        }
++
++        notify["value"].connect (write_to_backlights);
++        notify["dimming-enabled"].connect (write_to_backlights);
++        notify["auto-brightness-target"].connect (write_to_backlights);
++    }
++
++    private void on_brightness_changed (Object obj, ParamSpec pspec) {
++        if (writing_backlights) {
++            return;
++        }
++
++        value = get_relative_brightness ((Meta.Backlight) obj);
++    }
++
++    private void write_to_backlights () {
++        var real_brightness = value;
++        if (auto_brightness_target >= 0) {
++            /* If we have an auto brightness target we use the value as a bias around that
++               instead of directly */
++            real_brightness = (auto_brightness_target + value - 0.5).clamp (0.0, 1.0);
++        }
++
++        if (dimming_enabled) {
++            var dimming_max = dimming_settings != null ? (double) dimming_settings.get_int ("idle-brightness") / 100.0 : 0.3;
++            real_brightness = double.min (real_brightness, dimming_max);
++        }
++
++        writing_backlights = true;
++
++        foreach (var backlight in backlights) {
++            set_relative_brightness (backlight, real_brightness);
++        }
++
++        writing_backlights = false;
++    }
++
++    private static double get_relative_brightness (Meta.Backlight backlight) {
++        var current = backlight.brightness;
++        var min = backlight.brightness_min;
++        var max = backlight.brightness_max;
++
++        return (double) (current - min) / (max - min);
++    }
++
++    private static void set_relative_brightness (Meta.Backlight backlight, double value) {
++        var min = backlight.brightness_min;
++        var max = backlight.brightness_max;
++        var brightness = (int) (min + (value * (max - min)));
++
++        if (backlight.brightness != brightness) {
++            backlight.brightness = brightness;
++        }
++    }
++
++    public static int brightness_compare_func (MonitorBrightness a, MonitorBrightness b) {
++        if (a.value < b.value) {
++            return -1;
++        } else if (a.value > b.value) {
++            return 1;
++        } else {
++            return 0;
++        }
++    }
++}
++#endif
+diff --git a/src/meson.build b/src/meson.build
+index 6b941f249..6cacc0c4a 100644
+--- a/src/meson.build
++++ b/src/meson.build
+@@ -46,6 +46,9 @@ gala_bin_sources = files(
+     'Misc/WindowTracker.vala',
+     'Misc/WorkspaceManager.vala',
+     'Misc/Zoom.vala',
++    'Misc/Brightness/BrightnessManager.vala',
++    'Misc/Brightness/GSDBrightnessAdapter.vala',
++    'Misc/Brightness/MonitorBrightness.vala',
+     'Misc/OSK/OSKManager.vala',
+     'Misc/OSK/OSKProxy.vala',
+     'Misc/OSK/OSKReceiver.vala',
+diff --git a/vapi/Meta-18.metadata b/vapi/Meta-18.metadata
+index 05cf306ee..d85250716 100644
+--- a/vapi/Meta-18.metadata
++++ b/vapi/Meta-18.metadata
+@@ -12,6 +12,7 @@ BackgroundContent cheader_filename="meta/meta-background-content.h"
+ BackgroundGroup cheader_filename="meta/meta-background-group.h"
+ BackgroundImage cheader_filename="meta/meta-background-image.h"
+ BackgroundImageCache cheader_filename="meta/meta-background-image.h"
++Backlight cheader_filename="meta/meta-backlight.h"
+ Barrier cheader_filename="meta/barrier.h"
+ BarrierDirection cheader_filename="meta/barrier.h"
+ BarrierEvent cheader_filename="meta/barrier.h"
+@@ -56,6 +57,7 @@ KeyHandlerFunc.window nullable
+ LaunchContext cheader_filename="meta/meta-launch-context.h"
+ Laters cheader_filename="meta/types.h"
+ LaterType cheader_filename="meta/util.h"
++LogicalMonitor cheader_filename="meta/meta-logical-monitor.h"
+ MaximizeFlags cheader_filename="meta/window.h"
+ MultiTexture cheader_filename="meta/meta-multi-texture.h"
+ MultiTextureAlphaMode.n_meta_multi_texture_alpha_modes name="N_MODES"
+@@ -67,6 +69,7 @@ MultiTextureCoefficients cheader_filename="meta/meta-multi-texture-format.h" cpr
+ MultiTextureFormat.n_meta_multi_texture_formats name="N_FORMATS"
+ MultiTextureFormat.meta_multi_texture_format_* name="meta_multi_texture_format_(.+)"
+ MultiTextureFormat cheader_filename="meta/meta-multi-texture-format.h" cprefix="META_MULTI_TEXTURE_FORMAT_"
++Monitor cheader_filename="meta/meta-monitor.h"
+ MonitorManager cheader_filename="meta/meta-monitor-manager.h"
+ MonitorSwitchConfigType cheader_filename="meta/meta-monitor-manager.h"
+ MotionDirection cheader_filename="meta/common.h"
+diff --git a/vapi/libmutter.vapi b/vapi/libmutter.vapi
+index 9b6a81576..ff133b5fa 100644
+--- a/vapi/libmutter.vapi
++++ b/vapi/libmutter.vapi
+@@ -276,7 +276,7 @@ namespace Meta {
+ 		public void purge (GLib.File file);
+ 	}
+ #if HAS_MUTTER49
+-	[CCode (cheader_filename = "meta/main.h", type_id = "meta_backlight_get_type ()")]
++	[CCode (cheader_filename = "meta/meta-backlight.h", type_id = "meta_backlight_get_type ()")]
+ 	public abstract class Backlight : GLib.Object {
+ 		[CCode (has_construct_function = false)]
+ 		protected Backlight ();
+@@ -647,14 +647,14 @@ namespace Meta {
+ 		public Meta.Workspace workspace { owned get; set; }
+ 	}
+ #if HAS_MUTTER49
+-	[CCode (cheader_filename = "meta/main.h", type_id = "meta_logical_monitor_get_type ()")]
++	[CCode (cheader_filename = "meta/meta-logical-monitor.h", type_id = "meta_logical_monitor_get_type ()")]
+ 	public class LogicalMonitor : GLib.Object {
+ 		[CCode (has_construct_function = false)]
+ 		protected LogicalMonitor ();
+ 		public unowned GLib.List<Meta.Monitor> get_monitors ();
+ 		public int get_number ();
+ 	}
+-	[CCode (cheader_filename = "meta/main.h", type_id = "meta_monitor_get_type ()")]
++	[CCode (cheader_filename = "meta/meta-monitor.h", type_id = "meta_monitor_get_type ()")]
+ 	public class Monitor : GLib.Object {
+ 		[CCode (has_construct_function = false)]
+ 		protected Monitor ();

@@ -1,0 +1,217 @@
+diff --git a/src/Backends/AbstractBackend.vala b/src/Backends/AbstractBackend.vala
+index 698fe0f..717bdf4 100644
+--- a/src/Backends/AbstractBackend.vala
++++ b/src/Backends/AbstractBackend.vala
+@@ -24,6 +24,10 @@ public abstract class Privacy.AbstractBackend {
+     public abstract signal void deactivated ();
+     public abstract signal void apps_changed ();
+ 
++    // Emitted while the backend's resource is actively being requested, as
++    // opposed to merely held open by a long-lived client.
++    public signal void requesting_changed (bool requesting);
++
+     public abstract Gtk.Widget get_app_list ();
+     public abstract void update_app_list ();
+     public abstract void added ();
+diff --git a/src/Backends/LocationBackend.vala b/src/Backends/LocationBackend.vala
+index 353330b..9b8af30 100644
+--- a/src/Backends/LocationBackend.vala
++++ b/src/Backends/LocationBackend.vala
+@@ -23,13 +23,24 @@ public class Privacy.Backends.Location : Privacy.AbstractBackend {
+ 
+     private const string GEOCLUE_BUS_NAME = "org.freedesktop.GeoClue2";
+     private const string GEOCLUE_MANAGER_BUS_PATH = "/org/freedesktop/GeoClue2/Manager";
++    private const string GEOCLUE_CLIENT_INTERFACE = "org.freedesktop.GeoClue2.Client";
++    // Give up on a request that never produces a location; geoclue doesn't
++    // report clients that disconnect without calling Stop ().
++    private const uint REQUEST_TIMEOUT_SECONDS = 10;
++
+     private Services.DBusInterfaces.GeoclueManager geoclue_manager;
+     private ulong props_changed_id;
++    private DBusConnection? system_bus = null;
++    private uint client_signals_id = 0;
++    // Client object path -> timeout source of a request still waiting for its
++    // first location.
++    private Gee.HashMap<string, uint> pending_requests;
+ 
+     private Widgets.AppList app_list_widget;
+ 
+     public Location () {
+         app_list_widget = new Widgets.AppList (BACKEND_NAME);
++        pending_requests = new Gee.HashMap<string, uint> ();
+     }
+ 
+     public override Gtk.Widget get_app_list () {
+@@ -66,18 +77,111 @@ public class Privacy.Backends.Location : Privacy.AbstractBackend {
+                 if (geoclue_manager.InUse) {
+                     activated ();
+                 } else {
++                    clear_requests ();
+                     deactivated ();
+                     app_list_widget.clear_apps ();
+                 }
+             });
++
++            // Client properties are only readable by their owner, but their
++            // change notifications and LocationUpdated are broadcast.
++            system_bus = conn;
++            client_signals_id = conn.signal_subscribe (
++                GEOCLUE_BUS_NAME, null, null, null, null,
++                DBusSignalFlags.NONE, on_client_signal
++            );
+         } catch (IOError e) {
+             warning ("Error connecting to geoclue2 via dbus: %s", e.message);
+         }
+     }
+ 
+     private void on_geoclue_stop (DBusConnection conn) {
+-        geoclue_manager.disconnect (props_changed_id);
++        if (geoclue_manager != null) {
++            geoclue_manager.disconnect (props_changed_id);
++        }
++
++        if (client_signals_id != 0) {
++            system_bus.signal_unsubscribe (client_signals_id);
++            client_signals_id = 0;
++        }
++
++        clear_requests ();
+         deactivated ();
+         app_list_widget.clear_apps ();
+     }
++
++    private void on_client_signal (
++        DBusConnection conn,
++        string? sender,
++        string object_path,
++        string interface_name,
++        string signal_name,
++        Variant parameters
++    ) {
++        if (interface_name == GEOCLUE_CLIENT_INTERFACE && signal_name == "LocationUpdated") {
++            finish_request (object_path);
++            return;
++        }
++
++        if (interface_name != "org.freedesktop.DBus.Properties" || signal_name != "PropertiesChanged") {
++            return;
++        }
++
++        if (!parameters.is_of_type (new VariantType ("(sa{sv}as)")) ||
++            parameters.get_child_value (0).get_string () != GEOCLUE_CLIENT_INTERFACE) {
++            return;
++        }
++
++        var active = parameters.get_child_value (1).lookup_value ("Active", VariantType.BOOLEAN);
++        if (active == null) {
++            return;
++        }
++
++        if (active.get_boolean ()) {
++            start_request (object_path);
++        } else {
++            finish_request (object_path);
++        }
++    }
++
++    private void start_request (string client_path) {
++        uint old_id;
++        if (pending_requests.unset (client_path, out old_id)) {
++            Source.remove (old_id);
++        }
++
++        var timeout_id = Timeout.add_seconds (REQUEST_TIMEOUT_SECONDS, () => {
++            pending_requests.unset (client_path);
++            update_requesting ();
++            return Source.REMOVE;
++        });
++        pending_requests[client_path] = timeout_id;
++        update_requesting ();
++    }
++
++    private void finish_request (string client_path) {
++        uint timeout_id;
++        if (pending_requests.unset (client_path, out timeout_id)) {
++            Source.remove (timeout_id);
++            update_requesting ();
++        }
++    }
++
++    private void clear_requests () {
++        foreach (var timeout_id in pending_requests.values) {
++            Source.remove (timeout_id);
++        }
++        pending_requests.clear ();
++        update_requesting ();
++    }
++
++    private bool requesting = false;
++
++    private void update_requesting () {
++        var now_requesting = !pending_requests.is_empty;
++        if (now_requesting != requesting) {
++            requesting = now_requesting;
++            requesting_changed (requesting);
++        }
++    }
+ }
+diff --git a/src/Widgets/DisplayWidget.vala b/src/Widgets/DisplayWidget.vala
+index b041158..76e1c4e 100644
+--- a/src/Widgets/DisplayWidget.vala
++++ b/src/Widgets/DisplayWidget.vala
+@@ -20,14 +20,40 @@ public class Privacy.Widgets.DisplayWidget : Gtk.Box {
+ 
+     public signal void visibility_changed ();
+ 
++    // Pulse the location icon while an app is requesting a location. CSS animations follow
++    // gtk-enable-animations, so they stop when animations are turned off.
++    private const string CSS = """
++        @keyframes privacy-in-use-pulse {
++            from { opacity: 1; }
++            to   { opacity: 0.35; }
++        }
++
++        image.find-location-symbolic.in-use {
++            animation: privacy-in-use-pulse 1s ease-in-out infinite alternate;
++        }
++    """;
++
++    private static Gtk.CssProvider? provider = null;
++
+     private Gee.ArrayList<Gtk.Revealer> revealers;
+ 
+     construct {
+         revealers = new Gee.ArrayList<Gtk.Revealer> ();
++
++        if (provider == null) {
++            provider = new Gtk.CssProvider ();
++            provider.load_from_string (CSS);
++            Gtk.StyleContext.add_provider_for_display (
++                Gdk.Display.get_default (),
++                provider,
++                Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION
++            );
++        }
+     }
+ 
+     public void add_backend (AbstractBackend backend) {
+         var icon = new Gtk.Image.from_icon_name (backend.ICON_NAME);
++        icon.add_css_class (backend.ICON_NAME);
+ 
+         var revealer = new Gtk.Revealer () {
+             child = icon,
+@@ -49,6 +75,14 @@ public class Privacy.Widgets.DisplayWidget : Gtk.Box {
+             update_padding ();
+         });
+ 
++        backend.requesting_changed.connect ((requesting) => {
++            if (requesting) {
++                icon.add_css_class ("in-use");
++            } else {
++                icon.remove_css_class ("in-use");
++            }
++        });
++
+         backend.added ();
+     }
+ 

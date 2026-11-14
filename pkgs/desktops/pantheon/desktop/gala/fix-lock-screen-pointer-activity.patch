@@ -1,0 +1,61 @@
+diff --git a/src/Widgets/SessionLocker.vala b/src/Widgets/SessionLocker.vala
+index bd981862..93d092f1 100644
+--- a/src/Widgets/SessionLocker.vala
++++ b/src/Widgets/SessionLocker.vala
+@@ -83,6 +83,7 @@ public class Gala.SessionLocker : Clutter.Actor {
+     private DisplayManagerSeat? display_manager;
+ 
+     private uint animate_id = 0;
++    private uint user_active_watch = 0;
+ 
+     private UnixInputStream? inhibitor;
+ 
+@@ -340,6 +341,7 @@ public class Gala.SessionLocker : Clutter.Actor {
+         visible = true;
+         grab_key_focus ();
+         modal_proxy = wm.push_modal (this, true);
++        watch_user_active ();
+ 
+         if (Meta.Prefs.get_gnome_animations () && animate) {
+             animate_and_lock (animation_time);
+@@ -376,6 +378,32 @@ public class Gala.SessionLocker : Clutter.Actor {
+         });
+     }
+ 
++    // With the cursor hidden, pointer events don't reach us, so a mouse
++    // movement, click or scroll wouldn't bring up the greeter. Like
++    // gnome-shell's screen shield, notice any input via the idle monitor.
++    private void watch_user_active () {
++        if (user_active_watch != 0) {
++            return;
++        }
++
++        unowned var idle_monitor = wm.get_display ().get_context ().get_backend ().get_core_idle_monitor ();
++        user_active_watch = idle_monitor.add_user_active_watch (() => {
++            // User active watches only fire once
++            user_active_watch = 0;
++            on_user_became_active ();
++        });
++    }
++
++    private void unwatch_user_active () {
++        if (user_active_watch == 0) {
++            return;
++        }
++
++        unowned var idle_monitor = wm.get_display ().get_context ().get_backend ().get_core_idle_monitor ();
++        idle_monitor.remove_watch (user_active_watch);
++        user_active_watch = 0;
++    }
++
+     private void cancel_animation () {
+         if (animate_id != 0) {
+             GLib.Source.remove (animate_id);
+@@ -391,6 +419,7 @@ public class Gala.SessionLocker : Clutter.Actor {
+         }
+ 
+         cancel_animation ();
++        unwatch_user_active ();
+ 
+         is_locked = false;
+ 

@@ -23,15 +23,16 @@
   gettext,
 }:
 
-stdenv.mkDerivation rec {
+stdenv.mkDerivation {
   pname = "switchboard-plug-pantheon-shell";
-  version = "8.3.0";
+  version = "8.3.0-unstable-2026-11-09";
 
+  # nixpkgs-update: no auto update
   src = fetchFromGitHub {
     owner = "elementary";
     repo = "settings-desktop";
-    tag = version;
-    hash = "sha256-qczv+G0v47SiMsLlWjDPK0ZY4J+V/CXe/l7b6pWG+WY=";
+    rev = "4ae2976173e22ff0b66b22b9a4e80477159176d0";
+    hash = "sha256-j0j6GtSp3617WSn4xVhkXwMpL4DNEdAtesHzQ7MCQMM=";
   };
 
   nativeBuildInputs = [
@@ -44,10 +45,10 @@ stdenv.mkDerivation rec {
 
   buildInputs = [
     elementary-settings-daemon
-    gnome-settings-daemon
     gala
     gexiv2_0_10
     glib
+    gnome-settings-daemon
     granite7
     gtk4
     libadwaita

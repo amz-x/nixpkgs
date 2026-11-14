@@ -16,16 +16,22 @@
   wrapGAppsHook4,
 }:
 
-stdenv.mkDerivation rec {
+stdenv.mkDerivation {
   pname = "elementary-notifications";
-  version = "8.1.2";
+  version = "8.1.2-unstable-2026-11-13";
 
+  # nixpkgs-update: no auto update
   src = fetchFromGitHub {
     owner = "elementary";
     repo = "notifications";
-    tag = version;
-    hash = "sha256-qod76RSsCO9NvjnYTLRW6P1UyR1K6Uu9fEjU2WgHUWk=";
+    rev = "677a26506e3cbd4c991def23912d224596cce4a5";
+    hash = "sha256-bwCTB2AwjO1tsGikpepsr50hbqxdrI+8yX/p+3xnJC8=";
   };
+
+  patches = [
+    # Close button icon inherits the dark .osd fg in dark mode on a black background
+    ./fix-close-button-dark-icon.patch
+  ];
 
   strictDeps = true;
 

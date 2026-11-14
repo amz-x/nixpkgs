@@ -22,6 +22,7 @@
   linuxPackages,
   live-chart,
   pciutils,
+  systemd,
   udisks,
   wingpanel,
   nix-update-script,
@@ -29,14 +30,26 @@
 
 stdenv.mkDerivation (finalAttrs: {
   pname = "elementary-monitor";
-  version = "8.0.1";
+  version = "8.0.1-unstable-2026-11-13";
 
+  # nixpkgs-update: no auto update
   src = fetchFromGitHub {
     owner = "elementary";
     repo = "monitor";
-    tag = finalAttrs.version;
-    hash = "sha256-VlyIK7UJEHw7vvc9WEHooPSPl8OQ5ZcBrjtYrI3Qx/w=";
+    rev = "fa9d9201e7bf123b326cdcdc049f513bd2c62e64";
+    hash = "sha256-jZsc5SWFlJUWG7oJ/JlRtEJFPuoOjgEn+VaF/lmk8t4=";
   };
+
+  patches = [
+    # Load 2000 log entries at a time instead of 200
+    ./feature-increase-log-chunk-size.patch
+
+    # Journal entries without PRIORITY crashed the log view
+    ./fix-log-missing-priority-crash.patch
+
+    # Count used space of LUKS/LVM volumes on their NVMe drive
+    ./fix-storage-usage.patch
+  ];
 
   strictDeps = true;
 
@@ -64,6 +77,7 @@ stdenv.mkDerivation (finalAttrs: {
     linuxPackages.nvidia_x11.settings.libXNVCtrl
     live-chart
     pciutils
+    systemd
     udisks
     wingpanel
   ];
