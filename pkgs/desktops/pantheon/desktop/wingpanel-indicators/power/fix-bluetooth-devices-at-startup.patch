@@ -1,0 +1,17 @@
+diff --git a/src/Services/DeviceManager.vala b/src/Services/DeviceManager.vala
+index 7ce3eb8..09d56b1 100644
+--- a/src/Services/DeviceManager.vala
++++ b/src/Services/DeviceManager.vala
+@@ -111,8 +111,11 @@ public class Power.Services.DeviceManager : Object {
+ 
+         // this prevents from showing weird devices to show up.
+         // such as a laptops track pad pointer to show up as wacom tablet with no battery.
++        // Bluetooth devices (headsets, mice) report neither technology nor
++        // state, but are present and have a battery level, so keep them.
+         if ((device.technology == Device.Technology.UNKNOWN) &&
+-            (device.state == Device.State.UNKNOWN)) {
++            (device.state == Device.State.UNKNOWN) &&
++            !device.is_present) {
+             return false;
+         }
+         return true;

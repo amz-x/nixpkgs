@@ -20,15 +20,16 @@
   switchboard,
 }:
 
-stdenv.mkDerivation rec {
+stdenv.mkDerivation {
   pname = "switchboard-plug-security-privacy";
-  version = "8.0.2";
+  version = "8.0.2-unstable-2026-11-20";
 
+  # nixpkgs-update: no auto update
   src = fetchFromGitHub {
     owner = "elementary";
     repo = "settings-security-privacy";
-    tag = version;
-    hash = "sha256-OlLeeS0b4IMCvOMyHlIRaQl11ivn4Y2+vYdXOzIlvaw=";
+    rev = "faf8b5e5751d04fbf98ac296e11a6a8a2a4ae001";
+    hash = "sha256-54ZZkhWL5GWK9QDoiRVnHvOE6BXF/23ZFI8QU0PYK7Q=";
   };
 
   nativeBuildInputs = [

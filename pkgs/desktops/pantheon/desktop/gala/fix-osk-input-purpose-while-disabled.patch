@@ -1,0 +1,73 @@
+diff --git a/daemon/OSK/ModelManager.vala b/daemon/OSK/ModelManager.vala
+index c6b4e80..b5689cd 100644
+--- a/daemon/OSK/ModelManager.vala
++++ b/daemon/OSK/ModelManager.vala
+@@ -8,10 +8,14 @@
+ public class Gala.Daemon.ModelManager : Object {
+     public KeyboardModel? current_model { get; private set; }
+ 
+-    public IBus.InputPurpose input_purpose { get; set; default = FREE_FORM; }
++    public IBus.InputPurpose input_purpose { get; construct set; }
+ 
+     private Settings settings;
+ 
++    public ModelManager (IBus.InputPurpose input_purpose) {
++        Object (input_purpose: input_purpose);
++    }
++
+     construct {
+         notify["input-purpose"].connect (update_model);
+ 
+diff --git a/daemon/OSK/OSKService.vala b/daemon/OSK/OSKService.vala
+index f92c074..5ee8908 100644
+--- a/daemon/OSK/OSKService.vala
++++ b/daemon/OSK/OSKService.vala
+@@ -14,6 +14,8 @@ public class Gala.Daemon.OSKService : Object {
+ 
+     private IBusService ibus_service;
+ 
++    private IBus.InputPurpose input_purpose = FREE_FORM;
++
+     private bool enabled { get { return osk_window != null; } }
+ 
+     private ModelManager? model_manager;
+@@ -29,7 +31,7 @@ public class Gala.Daemon.OSKService : Object {
+         }
+ 
+         if (enabled) {
+-            model_manager = new ModelManager ();
++            model_manager = new ModelManager (input_purpose);
+ 
+             var input_manager = new InputManager (this);
+ 
+@@ -49,7 +51,12 @@ public class Gala.Daemon.OSKService : Object {
+         osk_window.reset ();
+     }
+ 
+-    public void set_input_purpose (IBus.InputPurpose input_purpose) throws DBusError, IOError requires (model_manager != null) {
+-        model_manager.input_purpose = input_purpose;
++    public void set_input_purpose (IBus.InputPurpose input_purpose) throws DBusError, IOError {
++        // Also sent while the OSK is disabled, keep it for when it gets enabled
++        this.input_purpose = input_purpose;
++
++        if (model_manager != null) {
++            model_manager.input_purpose = input_purpose;
++        }
+     }
+ }
+diff --git a/src/Misc/OSK/OSKManager.vala b/src/Misc/OSK/OSKManager.vala
+index b569604..04cc4be 100644
+--- a/src/Misc/OSK/OSKManager.vala
++++ b/src/Misc/OSK/OSKManager.vala
+@@ -48,6 +48,11 @@ public class Gala.OSKManager : Object {
+ 
+         if (osk != null) {
+             osk.set_enabled.begin (enabled);
++
++            // set_input_purpose () skips this while disabled
++            if (enabled) {
++                osk.set_input_purpose.begin (input_purpose);
++            }
+         }
+     }
+ 

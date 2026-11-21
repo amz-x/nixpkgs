@@ -9,6 +9,7 @@
   sassc,
   vala,
   wrapGAppsHook4,
+  appstream,
   gnome-settings-daemon,
   gtk4,
   pango,

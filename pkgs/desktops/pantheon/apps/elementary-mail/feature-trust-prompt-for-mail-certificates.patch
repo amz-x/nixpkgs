@@ -1,0 +1,71 @@
+diff --git a/src/Backend/Session.vala b/src/Backend/Session.vala
+index 69ea54e..f836f25 100644
+--- a/src/Backend/Session.vala
++++ b/src/Backend/Session.vala
+@@ -81,6 +81,66 @@ public class Mail.Backend.Session : Camel.Session {
+         registry.source_changed.connect (check_for_signature_change);
+     }
+ 
++    /*
++     * Camel rejects certificates it can't verify, like self-signed ones or a
++     * local bridge's, unless the session asks the user. Camel stores the answer
++     * in its certificate database, which Online Accounts uses too.
++     */
++    public override Camel.CertTrust trust_prompt (Camel.Service service, GLib.TlsCertificate certificate, GLib.TlsCertificateFlags errors) {
++        var settings = service.ref_settings ();
++        if (!(settings is Camel.NetworkSettings)) {
++            return Camel.CertTrust.UNKNOWN;
++        }
++
++        var host = ((Camel.NetworkSettings) settings).dup_host ();
++        var source_extension = (service is Camel.Transport) ? E.SOURCE_EXTENSION_MAIL_TRANSPORT : E.SOURCE_EXTENSION_MAIL_ACCOUNT;
++
++        var response = E.TrustPromptResponse.UNKNOWN;
++
++        // Camel calls this from its worker thread, but the prompt has to run on the main thread
++        if (GLib.MainContext.default ().is_owner ()) {
++            response = run_trust_prompt (source_extension, service.display_name, host, certificate.certificate_pem, errors);
++        } else {
++            var mutex = GLib.Mutex ();
++            var cond = GLib.Cond ();
++            var answered = false;
++
++            GLib.MainContext.default ().invoke (() => {
++                var main_response = run_trust_prompt (source_extension, service.display_name, host, certificate.certificate_pem, errors);
++
++                mutex.lock ();
++                response = main_response;
++                answered = true;
++                cond.signal ();
++                mutex.unlock ();
++
++                return GLib.Source.REMOVE;
++            });
++
++            mutex.lock ();
++            while (!answered) {
++                cond.wait (mutex);
++            }
++            mutex.unlock ();
++        }
++
++        switch (response) {
++            case E.TrustPromptResponse.ACCEPT:
++                return Camel.CertTrust.FULLY;
++            case E.TrustPromptResponse.ACCEPT_TEMPORARILY:
++                return Camel.CertTrust.TEMPORARY;
++            case E.TrustPromptResponse.REJECT:
++                return Camel.CertTrust.NEVER;
++            default:
++                return Camel.CertTrust.UNKNOWN;
++        }
++    }
++
++    private E.TrustPromptResponse run_trust_prompt (string source_extension, string display_name, string host, string certificate_pem, GLib.TlsCertificateFlags errors) {
++        unowned var application = (Gtk.Application) GLib.Application.get_default ();
++        return E.trust_prompt_run_modal (application.active_window, source_extension, display_name, host, certificate_pem, errors, null);
++    }
++
+     public override bool authenticate_sync (Camel.Service service, string? mechanism, GLib.Cancellable? cancellable = null) throws GLib.Error {
+         /* This function is heavily inspired by mail_ui_session_authenticate_sync in Evolution
+          * https://git.gnome.org/browse/evolution/tree/mail/e-mail-ui-session.c */

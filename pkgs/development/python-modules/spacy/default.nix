@@ -4,6 +4,7 @@
   buildPythonPackage,
   fetchFromGitHub,
   pythonAtLeast,
+  python,
 
   # build-system
   cymem,
@@ -110,6 +111,11 @@ buildPythonPackage (finalAttrs: {
   '';
 
   disabledTestMarks = [ "slow" ];
+
+  disabledTestPaths = lib.optionals (pythonAtLeast "3.14") [
+    # Flaky: AssertionError: assert 1 == 2 (len(ents) after overfitting)
+    "${python.sitePackages}/spacy/tests/parser/test_ner.py::test_overfitting_IO"
+  ];
 
   disabledTests = [
     # ValueError: [E002] Can't find factory for 'assert_sents' for language English (en).

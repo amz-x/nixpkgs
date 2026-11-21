@@ -1,0 +1,96 @@
+diff --git a/src/Indicator.vala b/src/Indicator.vala
+index 12e7e4f..7883e3c 100644
+--- a/src/Indicator.vala
++++ b/src/Indicator.vala
+@@ -3,6 +3,12 @@
+ * SPDX-FileCopyrightText: 2015-2025 elementary, Inc. (https://elementary.io)
+ */
+ 
++[DBus (name = "io.elementary.gala.WingpanelInterface")]
++interface Keyboard.WingpanelInterface : Object {
++    public signal void lock_state_changed (bool caps_lock, bool num_lock);
++    public abstract void get_lock_state (out bool caps_lock, out bool num_lock) throws GLib.Error;
++}
++
+ public class Keyboard.Indicator : Wingpanel.Indicator {
+     public Wingpanel.ServerType server_type { get; construct; }
+ 
+@@ -14,6 +20,9 @@ public class Keyboard.Indicator : Wingpanel.Indicator {
+     private Keyboard.Widgets.PopoverWidget popover_widget;
+     private Gtk.Label layouts_icon;
+     private Gtk.Revealer layouts_revealer;
++    private WingpanelInterface? wingpanel_interface = null;
++    private bool caps_lock_state = false;
++    private bool num_lock_state = false;
+ 
+     public Indicator (Wingpanel.ServerType server_type) {
+         GLib.Intl.bindtextdomain (Constants.GETTEXT_PACKAGE, Constants.LOCALEDIR);
+@@ -83,9 +92,17 @@ public class Keyboard.Indicator : Wingpanel.Indicator {
+             });
+ 
+             device.changed.connect (() => {
+-                update_visibility ();
++                if (wingpanel_interface == null) {
++                    update_lock_state_from_device ();
++                }
+             });
+ 
++            // On Wayland the panel never has keyboard focus, so GDK only learns about
++            // lock key changes once the panel is interacted with. Ask the compositor instead.
++            Bus.watch_name (SESSION, "io.elementary.gala.WingpanelInterface", NONE, on_interface_appeared, on_interface_vanished);
++            caps_lock_state = device.get_caps_lock_state ();
++            num_lock_state = device.get_num_lock_state ();
++
+             var gesture_click = new Gtk.GestureClick () {
+                 button = Gdk.BUTTON_MIDDLE
+             };
+@@ -113,8 +130,8 @@ public class Keyboard.Indicator : Wingpanel.Indicator {
+         layouts_icon.label = popover_widget.current_language_code[0:2];
+         layouts_revealer.reveal_child = popover_widget.has_multiple_layouts () || settings.get_boolean ("always-show-layout");
+ 
+-        numlock_revealer.reveal_child = device.get_num_lock_state () && settings.get_boolean ("numlock");
+-        capslock_revealer.reveal_child = device.get_caps_lock_state () && settings.get_boolean ("capslock");
++        numlock_revealer.reveal_child = num_lock_state && settings.get_boolean ("numlock");
++        capslock_revealer.reveal_child = caps_lock_state && settings.get_boolean ("capslock");
+ 
+         if (numlock_revealer.reveal_child && (layouts_revealer.reveal_child || capslock_revealer.reveal_child)) {
+             numlock_revealer.margin_end = 6;
+@@ -132,6 +149,38 @@ public class Keyboard.Indicator : Wingpanel.Indicator {
+         update_tooltip ();
+     }
+ 
++    private void on_interface_appeared (DBusConnection connection, string name, string name_owner) {
++        Bus.get_proxy.begin<WingpanelInterface> (SESSION, name, "/io/elementary/gala/WingpanelInterface", NONE, null, (obj, res) => {
++            try {
++                var proxy = Bus.get_proxy.end<WingpanelInterface> (res);
++                bool caps_lock, num_lock;
++                proxy.get_lock_state (out caps_lock, out num_lock);
++
++                proxy.lock_state_changed.connect (update_lock_state);
++                wingpanel_interface = proxy;
++                update_lock_state (caps_lock, num_lock);
++            } catch (Error e) {
++                // Older compositor plugin without lock state support
++                debug ("Unable to get lock state from compositor: %s", e.message);
++            }
++        });
++    }
++
++    private void on_interface_vanished (DBusConnection? connection, string name) {
++        wingpanel_interface = null;
++        update_lock_state_from_device ();
++    }
++
++    private void update_lock_state_from_device () {
++        update_lock_state (device.get_caps_lock_state (), device.get_num_lock_state ());
++    }
++
++    private void update_lock_state (bool caps_lock, bool num_lock) {
++        caps_lock_state = caps_lock;
++        num_lock_state = num_lock;
++        update_visibility ();
++    }
++
+     public override Gtk.Widget? get_widget () {
+         return popover_widget;
+     }

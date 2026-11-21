@@ -17,14 +17,15 @@
   nix-update-script,
 }:
 
-stdenv.mkDerivation rec {
+stdenv.mkDerivation {
   pname = "elementary-camera";
-  version = "9.0.0";
+  version = "9.0.0-unstable-2026-10-12";
 
+  # nixpkgs-update: no auto update
   src = fetchFromGitHub {
     owner = "elementary";
     repo = "camera";
-    rev = version;
+    rev = "0f92c02238d75584094f7e6b319719c93f676da2";
     hash = "sha256-0GwdCckL3+mxCScH5msxwXSbjPqKrn1i6RfP1R72muo=";
   };
 

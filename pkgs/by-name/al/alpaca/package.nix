@@ -90,6 +90,8 @@ pythonPackages.buildPythonApplication rec {
       zstandard
     ]
     ++ markitdown.optional-dependencies.docx
+    ++ markitdown.optional-dependencies.xlsx
+    ++ markitdown.optional-dependencies.xls
     ++ markitdown.optional-dependencies.pdf
     ++ markitdown.optional-dependencies.pptx
     ++ markitdown.optional-dependencies.youtube-transcription

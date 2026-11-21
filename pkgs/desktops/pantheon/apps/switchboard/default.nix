@@ -16,15 +16,16 @@
   wrapGAppsHook4,
 }:
 
-stdenv.mkDerivation rec {
+stdenv.mkDerivation {
   pname = "switchboard";
-  version = "8.0.3";
+  version = "8.0.3-unstable-2026-11-19";
 
+  # nixpkgs-update: no auto update
   src = fetchFromGitHub {
     owner = "elementary";
     repo = "switchboard";
-    rev = version;
-    hash = "sha256-pVXcY/QSjgBcTr0sFQnPxICoQ0tpy2fEJ687zHEDXA0=";
+    rev = "f38c6b600fe7c713e22c81746d7996642353b636";
+    hash = "sha256-j9GY4Cj7fGHJVIB+oLVHXI9NBjDBFl5FSZZ8s7d7NgE=";
   };
 
   nativeBuildInputs = [
@@ -46,7 +47,9 @@ stdenv.mkDerivation rec {
   ];
 
   patches = [
-    ./plugs-path-env.patch
+    # Find plugs through SWITCHBOARD_PLUGS_PATH, set by wrapper.nix, rather
+    # than /usr and /usr/local
+    ./fix-plugs-path-env.patch
   ];
 
   passthru = {
@@ -55,7 +58,7 @@ stdenv.mkDerivation rec {
 
   meta = {
     description = "Extensible System Settings app for Pantheon";
-    homepage = "https://github.com/elementary/switchboard";
+    homepage = "https://github.com/elementary/settings";
     license = lib.licenses.lgpl21Plus;
     platforms = lib.platforms.linux;
     teams = [ lib.teams.pantheon ];

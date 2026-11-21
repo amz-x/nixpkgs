@@ -13,22 +13,23 @@
   gtk4,
   glib,
   gnome-settings-daemon,
-  granite7,
+  granite9,
   libgee,
   mutter,
   pantheon-wayland,
   wrapGAppsHook4,
 }:
 
-stdenv.mkDerivation rec {
+stdenv.mkDerivation {
   pname = "elementary-shortcut-overlay";
-  version = "8.1.0";
+  version = "8.1.0-unstable-2026-11-13";
 
+  # nixpkgs-update: no auto update
   src = fetchFromGitHub {
     owner = "elementary";
     repo = "shortcut-overlay";
-    rev = version;
-    hash = "sha256-oGExG7eWiZqXEPBRuLRTnbgo3hRVKo8vO51vMBPoQb0=";
+    rev = "14b5dc237f553c6aa70f3bfe2bc9348d3ea962b1";
+    hash = "sha256-WjZVBZvvX+7ShViZqYKnn2QA8GVRm/C53s1bxuvPNJk=";
   };
 
   nativeBuildInputs = [
@@ -45,7 +46,7 @@ stdenv.mkDerivation rec {
     gsettings-desktop-schemas # org.gnome.desktop.wm.keybindings
     glib
     gnome-settings-daemon # org.gnome.settings-daemon.plugins.media-keys
-    granite7
+    granite9
     gtk4
     libgee
     mutter # org.gnome.mutter.keybindings

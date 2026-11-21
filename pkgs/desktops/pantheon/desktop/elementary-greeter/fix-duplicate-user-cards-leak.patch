@@ -1,0 +1,27 @@
+diff --git a/src/MainWindow.vala b/src/MainWindow.vala
+index 03501f2..73a421a 100644
+--- a/src/MainWindow.vala
++++ b/src/MainWindow.vala
+@@ -397,6 +397,22 @@ public class Greeter.MainWindow : Gtk.ApplicationWindow {
+     }
+ 
+     private void add_card (Act.User user) {
++        // load_users() gets rerun in full on every Act.UserManager
++        // "user-added" signal (which fires once per user as AccountsService
++        // enumerates them, and potentially again later), so without this
++        // guard every rerun would duplicate every existing card and leak
++        // the previous ones (never removed from the carousel).
++        bool already_added = false;
++        user_cards.head.foreach ((card) => {
++            if (card.user.user_name == user.user_name) {
++                already_added = true;
++            }
++        });
++
++        if (already_added) {
++            return;
++        }
++
+         var user_card = new Greeter.UserCard (user);
+ 
+         var click_gesture = new Gtk.GestureClick ();

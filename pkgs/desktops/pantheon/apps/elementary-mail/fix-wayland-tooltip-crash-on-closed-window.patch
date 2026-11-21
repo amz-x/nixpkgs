@@ -1,0 +1,39 @@
+diff --git a/src/Application.vala b/src/Application.vala
+index bf4b2e2..9c17f70 100644
+--- a/src/Application.vala
++++ b/src/Application.vala
+@@ -95,9 +95,34 @@ public class Mail.Application : Gtk.Application {
+         return 0;
+     }
+ 
++    /*
++     * GTK 3 on Wayland keeps a plain pointer to the window a tooltip (or any
++     * transient window) is attached to, and unsetting the parent through
++     * Gtk.Window.set_transient_for () doesn't reach it. When a window
++     * carrying a tooltip closes, like a context menu the pointer passed over,
++     * the tooltip later dereferences the freed window and Mail crashes. Detach
++     * them in GDK before the closing window's Gdk.Window goes away.
++     */
++    private static bool release_transient_windows (GLib.SignalInvocationHint hint, GLib.Value[] param_values) {
++        var closing = param_values[0].get_object () as Gtk.Window;
++        if (closing == null) {
++            return true;
++        }
++
++        foreach (unowned var window in Gtk.Window.list_toplevels ()) {
++            if (window != closing && window.get_transient_for () == closing && window.get_realized ()) {
++                window.get_window ().set_transient_for (null);
++            }
++        }
++
++        return true;
++    }
++
+     protected override void startup () {
+         base.startup ();
+ 
++        GLib.Signal.add_emission_hook (GLib.Signal.lookup ("unrealize", typeof (Gtk.Widget)), 0, release_transient_windows);
++
+         Hdy.init ();
+ 
+         var granite_settings = Granite.Settings.get_default ();

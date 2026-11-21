@@ -1,0 +1,31 @@
+diff --git a/src/ShellClients/ShellClientsManager.vala b/src/ShellClients/ShellClientsManager.vala
+index d3b3c8f..a4d30d9 100644
+--- a/src/ShellClients/ShellClientsManager.vala
++++ b/src/ShellClients/ShellClientsManager.vala
+@@ -225,6 +225,26 @@ public class Gala.ShellClientsManager : Object, GestureTarget {
+             window.focus (window.display.get_current_time ());
+         }
+ #endif
++
++        // The greeter maximizes before the panel reserves its strut. When it maps
++        // mutter moves it below the panel but keeps the size the client committed,
++        // pushing its bottom off screen, so fit it to the work area ourselves.
++        window.shown.connect (fit_greeter_to_work_area);
++        var workareas_changed_id = window.display.workareas_changed.connect (() => fit_greeter_to_work_area (window));
++        window.unmanaging.connect ((_window) => _window.display.disconnect (workareas_changed_id));
++    }
++
++    private static void fit_greeter_to_work_area (Meta.Window window) {
++        if (!window.mapped) {
++            return;
++        }
++
++        var work_area = window.get_work_area_current_monitor ();
++        if (window.get_frame_rect ().equal (work_area)) {
++            return;
++        }
++
++        window.move_resize_frame (false, work_area.x, work_area.y, work_area.width, work_area.height);
+     }
+ 
+     public void make_osk_window (Meta.Window window) requires (osk_window == null) {

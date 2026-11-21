@@ -1,0 +1,13 @@
+diff --git a/data/meson.build b/data/meson.build
+index a2b1820e..77aad250 100644
+--- a/data/meson.build
++++ b/data/meson.build
+@@ -27,7 +27,7 @@ i18n.merge_file(
+ 
+ install_data(
+     meson.project_name() + '.conf',
+-    install_dir: join_paths(get_option('sysconfdir'), 'lightdm')
++    install_dir: join_paths(get_option('prefix'), 'etc', 'lightdm')
+ )
+ 
+ install_data(

@@ -10,31 +10,27 @@
   gnome-session,
   wingpanel,
   orca,
-  onboard,
-  elementary-default-settings,
   gnome-settings-daemon,
-  runtimeShell,
   systemdLibs,
-  writeText,
   meson,
   ninja,
 }:
 
 stdenv.mkDerivation (finalAttrs: {
   pname = "elementary-session-settings";
-  version = "8.1.0";
+  version = "8.1.0-unstable-2026-11-19";
 
+  # nixpkgs-update: no auto update
   src = fetchFromGitHub {
     owner = "elementary";
     repo = "session-settings";
-    tag = finalAttrs.version;
-    hash = "sha256-mdfmCzR9ikXDlDc7FeOITsdbPbz+G66jUrl1BobY+g8=";
+    rev = "467f5c56e3c74d3974a038635cde2b7a6bb16872";
+    hash = "sha256-6hwMNwxB9oPlBVrEp4B9kQZBRBX5y/jhcuEZ8R6sR3g=";
   };
 
   patches = [
     # See https://github.com/elementary/session-settings/issues/88 for gnome-keyring.
-    # See https://github.com/elementary/session-settings/issues/82 for onboard.
-    ./no-autostart.patch
+    ./fix-no-autostart.patch
   ];
 
   nativeBuildInputs = [
@@ -48,7 +44,6 @@ stdenv.mkDerivation (finalAttrs: {
   buildInputs = [
     gnome-keyring
     gnome-settings-daemon
-    onboard
     orca
     systemdLibs
   ];

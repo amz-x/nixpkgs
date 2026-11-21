@@ -1,0 +1,27 @@
+--- a/src/Misc/InputMethod.vala
++++ b/src/Misc/InputMethod.vala
+@@ -78,13 +78,23 @@
+     }
+ 
+     private void on_input_context_created (Object? obj, AsyncResult res) {
++        IBus.InputContext new_context;
++
+         try {
+-            context = bus.create_input_context_async_finish (res);
++            new_context = bus.create_input_context_async_finish (res);
+         } catch (Error e) {
+             warning ("Failed to create IBus input context: %s", e.message);
+             return;
+         }
+ 
++        if (context != null) {
++            /* Dropping the old context disposes it, which emits destroy while the
++             * field still points to it, and on_destroy would unref it a second time. */
++            context.destroy.disconnect (on_destroy);
++        }
++
++        context = new_context;
++
+         context.commit_text.connect (on_commit_text);
+         context.require_surrounding_text.connect (on_require_surrounding_text);
+         context.delete_surrounding_text.connect (on_delete_surrounding_text);

@@ -17,24 +17,31 @@
   glib,
   gnome-settings-daemon,
   gobject-introspection,
-  gtk3,
-  granite,
+  gtk4,
+  granite7,
   libgee,
   packagekit,
   systemdLibs,
-  wrapGAppsHook3,
+  wrapGAppsHook4,
 }:
 
-stdenv.mkDerivation rec {
+stdenv.mkDerivation {
   pname = "elementary-settings-daemon";
-  version = "8.5.0";
+  version = "8.5.0-unstable-2026-11-20";
 
+  # nixpkgs-update: no auto update
   src = fetchFromGitHub {
     owner = "elementary";
     repo = "settings-daemon";
-    tag = version;
-    hash = "sha256-npHSj+Zq0fqWVjr5kl/C96gfziLMNOeXxCUgxFGht/s=";
+    rev = "dc993d93cde633ba43e0df5f09f08b802426b030";
+    hash = "sha256-sBp9JOfZbpm338G++KA7oD8dXjLxzlc87IMmTog2i9A=";
   };
+
+  patches = [
+    # Follow gala's D-Bus rename to io.elementary.gala
+    # https://github.com/elementary/gala/pull/2046
+    ./feature-gala-rdnn-dbus.patch
+  ];
 
   nativeBuildInputs = [
     desktop-file-utils
@@ -43,7 +50,7 @@ stdenv.mkDerivation rec {
     ninja
     pkg-config
     vala
-    wrapGAppsHook3
+    wrapGAppsHook4
   ];
 
   buildInputs = [
@@ -55,8 +62,8 @@ stdenv.mkDerivation rec {
     gexiv2_0_10
     glib
     gnome-settings-daemon # org.gnome.settings-daemon.* gschema
-    gtk3
-    granite
+    gtk4
+    granite7
     libgee
     packagekit
     systemdLibs
