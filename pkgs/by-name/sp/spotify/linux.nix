@@ -73,7 +73,6 @@ let
     atk
     cairo
     cups
-    curlWithGnuTls
     dbus
     expat
     ffmpeg_7-headless # Requires libavcodec < 62
@@ -204,6 +203,10 @@ stdenv.mkDerivation (finalAttrs: {
     ln -s ${nspr.out}/lib/libnspr4.so $libdir/libnspr4.so
     ln -s ${nspr.out}/lib/libplc4.so $libdir/libplc4.so
 
+    # Only expose libcurl-gnutls: LD_LIBRARY_PATH reaches apps that Spotify
+    # opens, and a GnuTLS libcurl.so.4 breaks ones linked to the OpenSSL one.
+    ln -s ${lib.getLib curlWithGnuTls}/lib/libcurl-gnutls.so.4 $libdir/libcurl-gnutls.so.4
+
     ln -s ${ffmpeg_7-headless.lib}/lib/libavcodec.so* $libdir
     ln -s ${ffmpeg_7-headless.lib}/lib/libavformat.so* $libdir
 
@@ -235,6 +238,8 @@ stdenv.mkDerivation (finalAttrs: {
   fixupPhase = ''
     runHook preFixup
 
+    # Don't unset DISPLAY for NIXOS_OZONE_WL=1:
+    # Spotify's native Wayland window gets a blue border, so keep it on X11.
     wrapProgramShell $out/share/spotify/spotify \
       ''${gappsWrapperArgs[@]} \
       ${
@@ -243,8 +248,7 @@ stdenv.mkDerivation (finalAttrs: {
         ''
       } \
       --prefix LD_LIBRARY_PATH : "$librarypath" \
-      --prefix PATH : "${zenity}/bin" \
-      --run 'if [[ "''${NIXOS_OZONE_WL:-default}" == "1" ]]; then unset DISPLAY; fi'
+      --prefix PATH : "${zenity}/bin"
 
     runHook postFixup
   '';

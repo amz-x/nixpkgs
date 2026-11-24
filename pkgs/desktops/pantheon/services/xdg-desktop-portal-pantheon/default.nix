@@ -21,14 +21,21 @@
 
 stdenv.mkDerivation {
   pname = "xdg-desktop-portal-pantheon";
-  version = "8.2.0-unstable-2026-06-04";
+  version = "8.2.0-unstable-2026-11-13";
 
+  # nixpkgs-update: no auto update
   src = fetchFromGitHub {
     owner = "elementary";
     repo = "portals";
-    rev = "c5f6fa1179bfa51429ddf4b2d268c7f2295dfff8";
-    hash = "sha256-gHWvY205Jy69LpNtqCr+prtalf7bSVZ971sGbhMuqnA=";
+    rev = "9d6fd99e69ebb37279d0395e2cc83e6a11f80f26";
+    hash = "sha256-9IPK9brd1wLTP7INNGq/BqbkDHdZ5CnG6kcvy/meoZA=";
   };
+
+  patches = [
+    # Follow gala's D-Bus rename to io.elementary.gala
+    # https://github.com/elementary/gala/pull/2046
+    ./feature-gala-rdnn-dbus.patch
+  ];
 
   nativeBuildInputs = [
     meson

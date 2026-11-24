@@ -1,0 +1,258 @@
+From 50514101273171d009af3c37e9f7ab212b24c74e Mon Sep 17 00:00:00 2001
+From: Christopher Crouse <mail@amz-x.com>
+Date: Mon, 2 Nov 2026 11:50:26 +0200
+Subject: [PATCH] wayland-session: keep the console hidden between greeter and
+ session
+
+LightDM switches to the VT of a Wayland session before the compositor has
+started, and kills the greeter right after that. Until the compositor of
+the new session has taken control through logind:
+
+- nothing has the new VT open, so logind starts a getty (autovt@.service)
+  on it, which resets it to text mode and shows a login prompt, and then
+  stays around on the session's VT;
+- once the greeter is gone nothing has the DRM devices open, so the kernel
+  restores its fbdev console on last close.
+
+Do what Xorg and GDM do instead: open the VT when it is assigned to the
+session, put it into graphics mode and keep it open until the session is
+done with it. Also keep the DRM devices open (without being master) for
+as long, so the last frame of the greeter stays on screen until the new
+compositor does its first modeset.
+---
+ src/vt.c              | 53 +++++++++++++++++++++++++-
+ src/vt.h              |  6 +++
+ src/wayland-session.c | 89 ++++++++++++++++++++++++++++++++++++++++---
+ 3 files changed, 142 insertions(+), 6 deletions(-)
+
+diff --git a/src/vt.c b/src/vt.c
+index 2874655..2a70853 100644
+--- a/src/vt.c
++++ b/src/vt.c
+@@ -21,6 +21,7 @@
+ #endif
+ #ifdef __linux__
+ #include <linux/vt.h>
++#include <linux/kd.h>
+ #endif
+ 
+ #include "vt.h"
+@@ -141,7 +142,7 @@ vt_set_active (gint number)
+ #endif
+ }
+ 
+-static gboolean
++gboolean
+ vt_is_used (gint number)
+ {
+     for (GList *link = used_vts; link; link = link->next)
+@@ -190,3 +191,53 @@ vt_unref (gint number)
+     g_debug ("Releasing VT %d", number);
+     used_vts = g_list_remove (used_vts, GINT_TO_POINTER (number));
+ }
++
++gint
++vt_open_for_session (gint number)
++{
++#if defined(__linux__)
++    if (getuid () != 0 || number <= 0)
++        return -1;
++
++    /* Keep the VT open while the session uses it: logind starts a getty
++     * (autovt@.service) on any VT it switches to that nobody has open, and
++     * that would reset the VT to text mode and show a login prompt until the
++     * compositor takes control of the session. */
++    g_autofree gchar *path = g_strdup_printf ("/dev/tty%d", number);
++    gint tty_fd = g_open (path, O_RDWR | O_NOCTTY | O_CLOEXEC, 0);
++    if (tty_fd < 0)
++    {
++        g_warning ("Error opening %s: %s", path, strerror (errno));
++        return -1;
++    }
++
++    /* Put the VT into graphics mode before switching to it, so the kernel
++     * console isn't painted while the compositor is starting up (logind only
++     * does this once the compositor calls TakeControl). */
++    g_debug ("Setting VT %d to graphics mode", number);
++    if (ioctl (tty_fd, KDSETMODE, KD_GRAPHICS) < 0)
++        g_warning ("Error using KDSETMODE on %s: %s", path, strerror (errno));
++
++    return tty_fd;
++#else
++    return -1;
++#endif
++}
++
++void
++vt_close_for_session (gint number, gint tty_fd, gboolean restore_text_mode)
++{
++#if defined(__linux__)
++    if (tty_fd < 0)
++        return;
++
++    if (restore_text_mode)
++    {
++        g_debug ("Setting VT %d to text mode", number);
++        if (ioctl (tty_fd, KDSETMODE, KD_TEXT) < 0)
++            g_warning ("Error using KDSETMODE on VT %d: %s", number, strerror (errno));
++    }
++
++    close (tty_fd);
++#endif
++}
+diff --git a/src/vt.h b/src/vt.h
+index a731bec..1783141 100644
+--- a/src/vt.h
++++ b/src/vt.h
+@@ -28,4 +28,10 @@ void vt_unref (gint number);
+ 
+ void vt_set_active (gint number);
+ 
++gboolean vt_is_used (gint number);
++
++gint vt_open_for_session (gint number);
++
++void vt_close_for_session (gint number, gint tty_fd, gboolean restore_text_mode);
++
+ #endif /* VT_H_ */
+diff --git a/src/wayland-session.c b/src/wayland-session.c
+index 48bcb6b..18364ad 100644
+--- a/src/wayland-session.c
++++ b/src/wayland-session.c
+@@ -9,18 +9,95 @@
+  * license.
+  */
+ 
++#include <errno.h>
++#include <fcntl.h>
++#include <string.h>
++#include <unistd.h>
++#include <sys/ioctl.h>
++#include <glib/gstdio.h>
++
+ #include "wayland-session.h"
+ #include "vt.h"
+ 
++/* DRM_IOCTL_DROP_MASTER from <drm/drm.h> */
++#define LIGHTDM_DRM_IOCTL_DROP_MASTER _IO ('d', 0x1f)
++
+ typedef struct
+ {
+     /* VT to run on */
+     gint vt;
+     gboolean have_vt_ref;
++    /* Open VT, keeps logind from starting a getty on it */
++    gint vt_fd;
++    /* Open DRM devices, keep the kernel from restoring its fbdev console in between compositors */
++    GArray *drm_fds;
+ } WaylandSessionPrivate;
+ 
+ G_DEFINE_TYPE_WITH_PRIVATE (WaylandSession, wayland_session, DISPLAY_SERVER_TYPE)
+ 
++static void
++hold_drm_devices (WaylandSessionPrivate *priv)
++{
++#if defined(__linux__)
++    /* When the last open file of a DRM device is closed the kernel restores
++     * its fbdev console, which happens when the greeter exits before the
++     * compositor of the new session has opened the device. Keep the devices
++     * open while the session uses its VT, so the last frame of the greeter
++     * stays up until the new compositor does its first modeset. */
++    if (getuid () != 0)
++        return;
++
++    g_autoptr(GDir) dir = g_dir_open ("/dev/dri", 0, NULL);
++    if (!dir)
++        return;
++
++    const gchar *name;
++    while ((name = g_dir_read_name (dir)))
++    {
++        if (!g_str_has_prefix (name, "card"))
++            continue;
++
++        g_autofree gchar *path = g_build_filename ("/dev/dri", name, NULL);
++        gint fd = g_open (path, O_RDWR | O_NOCTTY | O_CLOEXEC, 0);
++        if (fd < 0)
++        {
++            g_debug ("Failed to open %s: %s", path, strerror (errno));
++            continue;
++        }
++
++        /* Opening a device that has no master makes us master, give it up
++         * again so the compositor can become master (fails if we're not) */
++        ioctl (fd, LIGHTDM_DRM_IOCTL_DROP_MASTER, 0);
++
++        g_debug ("Holding %s open", path);
++        g_array_append_val (priv->drm_fds, fd);
++    }
++#endif
++}
++
++static void
++release_drm_devices (WaylandSessionPrivate *priv)
++{
++    for (guint i = 0; i < priv->drm_fds->len; i++)
++        close (g_array_index (priv->drm_fds, gint, i));
++    g_array_set_size (priv->drm_fds, 0);
++}
++
++static void
++release_vt (WaylandSessionPrivate *priv)
++{
++    if (!priv->have_vt_ref)
++        return;
++
++    vt_unref (priv->vt);
++    priv->have_vt_ref = FALSE;
++
++    /* Restore the text console unless another display server still uses the VT */
++    vt_close_for_session (priv->vt, priv->vt_fd, !vt_is_used (priv->vt));
++    priv->vt_fd = -1;
++    release_drm_devices (priv);
++}
++
+ WaylandSession *
+ wayland_session_new (void)
+ {
+@@ -34,14 +111,14 @@ wayland_session_set_vt (WaylandSession *session, gint vt)
+ 
+     g_return_if_fail (session != NULL);
+ 
+-    if (priv->have_vt_ref)
+-        vt_unref (priv->vt);
+-    priv->have_vt_ref = FALSE;
++    release_vt (priv);
+     priv->vt = vt;
+     if (vt > 0)
+     {
+         vt_ref (vt);
+         priv->have_vt_ref = TRUE;
++        priv->vt_fd = vt_open_for_session (vt);
++        hold_drm_devices (priv);
+     }
+ }
+ 
+@@ -84,6 +161,8 @@ wayland_session_init (WaylandSession *session)
+ {
+     WaylandSessionPrivate *priv = wayland_session_get_instance_private (session);
+     priv->vt = -1;
++    priv->vt_fd = -1;
++    priv->drm_fds = g_array_new (FALSE, FALSE, sizeof (gint));
+ }
+ 
+ static void
+@@ -92,8 +171,8 @@ wayland_session_finalize (GObject *object)
+     WaylandSession *self = WAYLAND_SESSION (object);
+     WaylandSessionPrivate *priv = wayland_session_get_instance_private (self);
+ 
+-    if (priv->have_vt_ref)
+-        vt_unref (priv->vt);
++    release_vt (priv);
++    g_array_unref (priv->drm_fds);
+ 
+     G_OBJECT_CLASS (wayland_session_parent_class)->finalize (object);
+ }
+-- 
+2.56.0
+

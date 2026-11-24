@@ -1,0 +1,28 @@
+diff --git a/src/Widgets/DeviceList.vala b/src/Widgets/DeviceList.vala
+index 14613b5..e173042 100644
+--- a/src/Widgets/DeviceList.vala
++++ b/src/Widgets/DeviceList.vala
+@@ -60,6 +60,10 @@ public class Power.Widgets.DeviceList : Granite.Bin {
+     }
+ 
+     private void add_battery (string device_path, Services.Device battery) {
++        // UPower can announce a path that is already listed (e.g. a Bluetooth
++        // headset reconnecting); replace its row instead of adding another.
++        remove_battery (device_path);
++
+         var device_row = new Power.Widgets.DeviceRow (battery);
+ 
+         entries.@set (device_path, device_row);
+@@ -74,7 +78,11 @@ public class Power.Widgets.DeviceList : Granite.Bin {
+             return;
+         }
+ 
+-        entries.@get (device_path).destroy ();
++        // Widget.destroy () is only a signal in GTK4 and doesn't remove the
++        // row, so take it out of the list explicitly.
++        var device_row = entries.@get (device_path);
++        listbox.remove (device_row);
++        path_entries.unset (device_row);
+ 
+         entries.unset (device_path);
+     }

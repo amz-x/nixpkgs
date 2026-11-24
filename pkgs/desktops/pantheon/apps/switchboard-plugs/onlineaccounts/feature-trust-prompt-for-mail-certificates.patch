@@ -1,0 +1,110 @@
+diff --git a/meson.build b/meson.build
+index f08456e..68ad720 100644
+--- a/meson.build
++++ b/meson.build
+@@ -34,6 +34,7 @@ add_project_arguments(['--vapidir', join_paths(meson.current_source_dir(), 'vapi
+ ecal_vapi = meson.get_compiler('vala').find_library('libecal-2.0-fixes', dirs: meson.current_source_dir() / 'vapi')
+ camel_dep = dependency('camel-1.2', version: '>= 3.28')
+ edataserver_dep = dependency('libedataserver-1.2', version: '>=3.45.1')
++edataserverui_dep = dependency('libedataserverui4-1.0')
+ glib_dep = dependency('glib-2.0')
+ gobject_dep = dependency('gobject-2.0')
+ granite_dep = dependency('granite-7', version: '>=7.1.0')
+diff --git a/src/Dialogs/Imap/CamelSession.vala b/src/Dialogs/Imap/CamelSession.vala
+index 7f544b2..b44ae0f 100644
+--- a/src/Dialogs/Imap/CamelSession.vala
++++ b/src/Dialogs/Imap/CamelSession.vala
+@@ -22,6 +22,9 @@ public class OnlineAccounts.CamelSession : Camel.Session {
+ 
+     private static CamelSession? session = null;
+ 
++    /* The window trust prompts are shown for */
++    public weak Gtk.Window? parent_window { get; set; default = null; }
++
+     public static unowned CamelSession get_default () {
+         if (session == null) {
+             session = new CamelSession ();
+@@ -42,4 +45,59 @@ public class OnlineAccounts.CamelSession : Camel.Session {
+         set_online (true);
+         user_alert.connect ((service, type, message) => { warning (message); });
+     }
++
++    /*
++     * Camel rejects certificates it can't verify, like self-signed ones, unless
++     * the session asks the user. Camel stores the answer in its certificate
++     * database, which mail clients using the same data directory read too.
++     */
++    public override Camel.CertTrust trust_prompt (Camel.Service service, GLib.TlsCertificate certificate, GLib.TlsCertificateFlags errors) {
++        var settings = service.ref_settings ();
++        if (!(settings is Camel.NetworkSettings)) {
++            return Camel.CertTrust.UNKNOWN;
++        }
++
++        var host = ((Camel.NetworkSettings) settings).dup_host ();
++        var source_extension = (service is Camel.Transport) ? E.SOURCE_EXTENSION_MAIL_TRANSPORT : E.SOURCE_EXTENSION_MAIL_ACCOUNT;
++
++        var response = E.TrustPromptResponse.UNKNOWN;
++
++        // Camel calls this from its worker thread, but the prompt has to run on the main thread
++        if (GLib.MainContext.default ().is_owner ()) {
++            response = E.trust_prompt_run_modal (parent_window, source_extension, service.display_name, host, certificate.certificate_pem, errors, null);
++        } else {
++            var mutex = GLib.Mutex ();
++            var cond = GLib.Cond ();
++            var answered = false;
++
++            GLib.MainContext.default ().invoke (() => {
++                var main_response = E.trust_prompt_run_modal (parent_window, source_extension, service.display_name, host, certificate.certificate_pem, errors, null);
++
++                mutex.lock ();
++                response = main_response;
++                answered = true;
++                cond.signal ();
++                mutex.unlock ();
++
++                return GLib.Source.REMOVE;
++            });
++
++            mutex.lock ();
++            while (!answered) {
++                cond.wait (mutex);
++            }
++            mutex.unlock ();
++        }
++
++        switch (response) {
++            case E.TrustPromptResponse.ACCEPT:
++                return Camel.CertTrust.FULLY;
++            case E.TrustPromptResponse.ACCEPT_TEMPORARILY:
++                return Camel.CertTrust.TEMPORARY;
++            case E.TrustPromptResponse.REJECT:
++                return Camel.CertTrust.NEVER;
++            default:
++                return Camel.CertTrust.UNKNOWN;
++        }
++    }
+ }
+diff --git a/src/Dialogs/Imap/ImapDialog.vala b/src/Dialogs/Imap/ImapDialog.vala
+index e0a57eb..a8475a9 100644
+--- a/src/Dialogs/Imap/ImapDialog.vala
++++ b/src/Dialogs/Imap/ImapDialog.vala
+@@ -569,6 +569,7 @@ public class OnlineAccounts.ImapDialog : PagedDialog {
+ 
+         /* verify connection */
+         unowned var session = CamelSession.get_default ();
++        session.parent_window = this;
+ 
+         debug ("Add imap service for mail account extension");
+         var imap_service = session.add_service (account_source.uid, account_extension.backend_name, Camel.ProviderType.STORE);
+diff --git a/src/meson.build b/src/meson.build
+index f8981ae..cac187f 100644
+--- a/src/meson.build
++++ b/src/meson.build
+@@ -27,6 +27,7 @@ shared_module(
+         gtk_dep,
+         adw_dep,
+         edataserver_dep,
++        edataserverui_dep,
+         switchboard_dep,
+         ecal_vapi
+     ],

@@ -61,10 +61,19 @@ stdenv.mkDerivation {
         rm $out/share/standardnotes/app.asar.unpacked/node_modules/microtime/build/node_gyp_bins/python3
         ln -s ${python3.interpreter} $out/share/standardnotes/app.asar.unpacked/node_modules/microtime/build/node_gyp_bins/python3
       ''}
+
       asar e $out/share/standardnotes/app.asar asar-unpacked
+
+      # The bundled @electron/remote renderer code uses the Buffer global, which
+      # sandboxed preloads only provided up to the Electron version upstream ships.
+      substituteInPlace asar-unpacked/dist/javascripts/renderer/preload.js \
+        --replace-fail 'e instanceof Buffer' '"undefined"!=typeof Buffer&&e instanceof Buffer' \
+        --replace-fail 'Buffer.from(e.value.buffer,' 'new Uint8Array(e.value.buffer,'
+
       find asar-unpacked -name '*.node' -exec patchelf \
         --add-rpath "${libPath}" \
         {} \;
+
       asar p asar-unpacked $out/share/standardnotes/app.asar
 
       makeWrapper ${electron}/bin/electron $out/bin/standardnotes \

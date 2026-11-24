@@ -1,0 +1,583 @@
+diff --git a/src/BrightnessManager.vala b/src/BrightnessManager.vala
+new file mode 100644
+index 00000000..2041cb69
+--- /dev/null
++++ b/src/BrightnessManager.vala
+@@ -0,0 +1,110 @@
++/*
++ * Copyright 2026 elementary, Inc. (https://elementary.io)
++ * SPDX-License-Identifier: GPL-3.0-or-later
++ *
++ * Authored by: Denis Garaev <garaevdi@outlook.com>
++ */
++
++public class Power.BrightnessManager : Object {
++    private const string GALA_INTERFACE = "io.elementary.gala.BrightnessManager";
++    private const string GALA_PATH = "/io/elementary/gala/BrightnessManager";
++
++    public signal void monitors_changed ();
++    public signal void monitor_brightness_changed (int index, double value);
++
++    private Power.GalaBrightnessManager? gala_brightness_manager;
++
++    private static BrightnessManager? instance = null;
++
++    public bool present {
++        get { return gala_brightness_manager != null; }
++    }
++
++    public bool has_monitors {
++        get {
++            if (gala_brightness_manager == null) {
++                return false;
++            }
++
++            return get_n_monitors () > 0;
++        }
++    }
++
++    construct {
++        try {
++            gala_brightness_manager = Bus.get_proxy_sync (BusType.SESSION, GALA_INTERFACE, GALA_PATH);
++            gala_brightness_manager.monitors_changed.connect (on_monitors_changed);
++            gala_brightness_manager.monitor_brightness_changed.connect (on_monitor_brightness_changed);
++        } catch (Error e) {
++            warning ("Couldn't connect to Gala's BrightnessManager: %s", e.message);
++        }
++    }
++
++    public static Power.BrightnessManager get_default () {
++        if (instance == null) {
++            instance = new BrightnessManager ();
++        }
++
++        return instance;
++    }
++
++    public int get_n_monitors () {
++        try {
++            return gala_brightness_manager.get_n_monitors ();
++        } catch (Error e) {
++            warning ("Couldn't get number of monitors: %s", e.message);
++            return -1;
++        }
++    }
++
++    public double get_global_brightness () {
++        try {
++            return gala_brightness_manager.get_global_brightness ().clamp (0.0001, 1.0);
++        } catch (Error e) {
++            warning ("Couldn't get global brightness: %s", e.message);
++            return -1.0f;
++        }
++    }
++
++    public void set_global_brightness (double value) {
++        try {
++            gala_brightness_manager.set_global_brightness (value.clamp (0.0001, 1.0));
++        } catch (Error e) {
++            warning ("Coulnd't set global brightness: %s", e.message);
++        }
++    }
++
++    public string get_monitor_name (int index) {
++        try {
++            return gala_brightness_manager.get_monitor_name (index);
++        } catch (Error e) {
++            warning ("Couldn't get %n monitor's name: %s", index, e.message);
++            return "";
++        }
++    }
++
++    public double get_monitor_brightness (int index) {
++        try {
++            return gala_brightness_manager.get_monitor_brightness (index).clamp (0.0001, 1);
++        } catch (Error e) {
++            warning ("Couldn't get %n monitor's brightness: %s", index, e.message);
++            return -1.0f;
++        }
++    }
++
++    public void set_monitor_brightness (int index, double value) {
++        try {
++            gala_brightness_manager.set_monitor_brightness (index, value.clamp (0.0001, 1));
++        } catch (Error e) {
++            warning ("Coulnd't set %n monitor's brightness: %s", index, e.message);
++        }
++    }
++
++    private void on_monitors_changed () {
++        monitors_changed ();
++    }
++
++    private void on_monitor_brightness_changed (int index, double value) {
++        monitor_brightness_changed (index, value);
++    }
++}
+diff --git a/src/Interfaces.vala b/src/Interfaces.vala
+index 9d8bdb0f..7d0413b5 100644
+--- a/src/Interfaces.vala
++++ b/src/Interfaces.vala
+@@ -39,9 +39,17 @@ namespace Power {
+         public signal void changed ();
+     }
+ 
+-    [DBus (name = "org.gnome.SettingsDaemon.Power.Screen")]
+-    interface PowerSettings : GLib.Object {
+-        public abstract int brightness {get; set; }
++    [DBus (name = "io.elementary.gala.BrightnessManager")]
++    interface GalaBrightnessManager : GLib.Object {
++        public signal void monitors_changed ();
++        public signal void monitor_brightness_changed (int index, double value);
++
++        public abstract double get_global_brightness () throws GLib.IOError, GLib.DBusError;
++        public abstract double get_monitor_brightness (int index) throws GLib.IOError, GLib.DBusError;
++        public abstract string get_monitor_name (int index) throws GLib.IOError, GLib.DBusError;
++        public abstract int get_n_monitors () throws GLib.IOError, GLib.DBusError;
++        public abstract void set_global_brightness (double scale) throws GLib.IOError, GLib.DBusError;
++        public abstract void set_monitor_brightness (int index, double brightness) throws GLib.IOError, GLib.DBusError;
+     }
+ 
+     [DBus (name = "org.freedesktop.UPower")]
+diff --git a/src/MainView.vala b/src/MainView.vala
+index f1899271..7a8153e0 100644
+--- a/src/MainView.vala
++++ b/src/MainView.vala
+@@ -20,19 +20,7 @@
+ public class Power.MainView : Switchboard.SettingsPage {
+     public Gtk.Stack stack { get; private set; }
+ 
+-    /* Smooth scrolling support */
+-    public bool natural_scroll_touchpad { get; set; }
+-    public bool natural_scroll_mouse { get; set; }
+-    private double total_x_delta = 0;
+-    private double total_y_delta= 0;
+-    private const double BRIGHTNESS_STEP = 4.0;
+-
+-    private const string SETTINGS_DAEMON_NAME = "org.gnome.SettingsDaemon.Power";
+-    private const string SETTINGS_DAEMON_PATH = "/org/gnome/SettingsDaemon/Power";
+-
+     private Gtk.DropDown powerbutton_dropdown;
+-    private Gtk.Scale scale;
+-    private PowerSettings screen;
+ 
+     private enum PowerActionType {
+         BLANK,
+@@ -52,24 +40,12 @@ public class Power.MainView : Switchboard.SettingsPage {
+     }
+ 
+     construct {
+-        var touchpad_settings = new GLib.Settings ("org.gnome.desktop.peripherals.touchpad");
+-        touchpad_settings.bind ("natural-scroll", this, "natural-scroll-touchpad", SettingsBindFlags.GET);
+-        var mouse_settings = new GLib.Settings ("org.gnome.desktop.peripherals.mouse");
+-        mouse_settings.bind ("natural-scroll", this, "natural-scroll-mouse", SettingsBindFlags.GET);
+-
+         var label_size = new Gtk.SizeGroup (Gtk.SizeGroupMode.HORIZONTAL);
+ 
+         settings = new GLib.Settings ("org.gnome.settings-daemon.plugins.power");
+ 
+         var power_manager = PowerManager.get_default ();
+ 
+-        try {
+-            screen = Bus.get_proxy_sync (BusType.SESSION, SETTINGS_DAEMON_NAME,
+-                SETTINGS_DAEMON_PATH, DBusProxyFlags.GET_INVALIDATED_PROPERTIES);
+-        } catch (IOError e) {
+-            warning ("Failed to get settings daemon for brightness setting");
+-        }
+-
+         var box = new Gtk.Box (VERTICAL, 24);
+ 
+         if (power_manager.batteries.n_items > 0) {
+@@ -86,7 +62,8 @@ public class Power.MainView : Switchboard.SettingsPage {
+ 
+         box.append (devices_box);
+ 
+-        if (screen.brightness != -1) {
++        var brightness_manager = BrightnessManager.get_default ();
++        if (brightness_manager.present) {
+             var als_switch = new Gtk.Switch () {
+                 halign = END
+             };
+@@ -98,48 +75,31 @@ public class Power.MainView : Switchboard.SettingsPage {
+ 
+             settings.bind ("ambient-enabled", als_switch, "active", SettingsBindFlags.DEFAULT);
+ 
+-            var scale_scroll_controller = new Gtk.EventControllerLegacy ();
+-
+-            scale = new Gtk.Scale.with_range (Gtk.Orientation.HORIZONTAL, 0, 100, 10) {
++            var screen_brightness_list = new ScreenBrightnessList () {
+                 hexpand = true
+             };
+-            scale.add_controller (scale_scroll_controller);
+-
+-            scale_scroll_controller.event.connect ((e) => {
+-                if (e.get_event_type () == Gdk.EventType.SCROLL) {
+-                    double dir = 0.0;
+-                    if (handle_scroll_event ((Gdk.ScrollEvent) e, out dir)) {
+-                        scale.set_value (scale.get_value () + Math.round (dir * BRIGHTNESS_STEP));
+-                    }
+-
+-                    return Gdk.EVENT_STOP;
+-                }
+-
+-                return Gdk.EVENT_PROPAGATE;
+-            });
+-
+-            scale.set_value (screen.brightness);
+-
+-            scale.value_changed.connect (on_scale_value_changed);
+-            ((DBusProxy)screen).g_properties_changed.connect (on_screen_properties_changed);
+-
+-            var brightness_label = new Gtk.Label (_("Display Brightness")) {
+-                mnemonic_widget = scale,
+-                xalign = 0
+-            };
+ 
+             var brightness_grid = new Gtk.Grid () {
+                 column_spacing = 12,
+                 row_spacing = 12
+             };
+-            brightness_grid.attach (brightness_label, 0, 0);
+-            brightness_grid.attach (scale, 1, 0);
++            brightness_grid.attach (screen_brightness_list, 0, 0, 2, 1);
+             brightness_grid.attach (als_label, 0, 1);
+             brightness_grid.attach (als_switch, 1, 1);
+ 
+-            box.append (brightness_grid);
++            var brightness_revealer = new Gtk.Revealer () {
++                child = brightness_grid,
++                reveal_child = brightness_manager.has_monitors
++            };
++            brightness_manager.bind_property (
++                "has-monitors",
++                brightness_revealer,
++                "reveal-child",
++                GLib.BindingFlags.DEFAULT
++            );
++            box.append (brightness_revealer);
+ 
+-            label_size.add_widget (brightness_label);
++            label_size.add_widget (screen_brightness_list);
+             label_size.add_widget (als_label);
+         }
+ 
+@@ -354,91 +314,6 @@ public class Power.MainView : Switchboard.SettingsPage {
+         });
+     }
+ 
+-    private void on_scale_value_changed () {
+-        var val = (int) scale.get_value ();
+-        ((DBusProxy)screen).g_properties_changed.disconnect (on_screen_properties_changed);
+-        screen.brightness = val;
+-        ((DBusProxy)screen).g_properties_changed.connect (on_screen_properties_changed);
+-    }
+-
+-    private void on_screen_properties_changed (Variant changed_properties, string[] invalidated_properties) {
+-        var changed_brightness = changed_properties.lookup_value ("Brightness", new VariantType ("i"));
+-        if (changed_brightness != null) {
+-            var val = screen.brightness;
+-            scale.value_changed.disconnect (on_scale_value_changed);
+-            scale.set_value (val);
+-            scale.value_changed.connect (on_scale_value_changed);
+-        }
+-    }
+-
+-    /* Handles both SMOOTH and non-SMOOTH events.
+-     * In order to deliver smooth brightness changes it:
+-     * * accumulates very small changes until they become significant.
+-     * * ignores rapid changes in direction.
+-     * * responds to both horizontal and vertical scrolling.
+-     * In the case of diagonal scrolling, it ignores the event unless movement in one direction
+-     * is more than twice the movement in the other direction.
+-     */
+-     private bool handle_scroll_event (Gdk.ScrollEvent e, out double dir) {
+-        dir = 0.0;
+-        bool natural_scroll;
+-        var event_source = e.get_device ().get_source ();
+-
+-        // If scroll is smooth it's probably a touchpad
+-        if (event_source == Gdk.InputSource.TOUCHPAD || e.get_direction () == Gdk.ScrollDirection.SMOOTH) {
+-            natural_scroll = natural_scroll_touchpad;
+-        } else if (event_source == Gdk.InputSource.MOUSE) {
+-            natural_scroll = natural_scroll_mouse;
+-        } else {
+-            natural_scroll = false;
+-        }
+-
+-        switch (e.get_direction ()) {
+-            case Gdk.ScrollDirection.SMOOTH:
+-                double dx, dy;
+-                e.get_deltas (out dx, out dy);
+-
+-                var abs_x = double.max (dx.abs (), 0.0001);
+-                var abs_y = double.max (dy.abs (), 0.0001);
+-
+-                if (abs_y / abs_x > 2.0) {
+-                    total_y_delta += dy;
+-                } else if (abs_x / abs_y > 2.0) {
+-                    total_x_delta += dx;
+-                }
+-
+-                break;
+-            case Gdk.ScrollDirection.UP:
+-                total_y_delta = -1.0;
+-                break;
+-            case Gdk.ScrollDirection.DOWN:
+-                total_y_delta = 1.0;
+-                break;
+-            case Gdk.ScrollDirection.LEFT:
+-                total_x_delta = -1.0;
+-                break;
+-            case Gdk.ScrollDirection.RIGHT:
+-                total_x_delta = 1.0;
+-                break;
+-            default:
+-                break;
+-        }
+-
+-        if (total_y_delta.abs () * BRIGHTNESS_STEP > 1.0) {
+-            dir = natural_scroll ? total_y_delta : -total_y_delta;
+-        } else if (total_x_delta.abs () * BRIGHTNESS_STEP > 1.0) {
+-            dir = natural_scroll ? -total_x_delta : total_x_delta;
+-        }
+-
+-        if (dir.abs () > 0.0) {
+-            total_y_delta = 0.0;
+-            total_x_delta = 0.0;
+-            return true;
+-        }
+-
+-        return false;
+-    }
+-
+     private void update_powerbutton_dropdown () {
+         int[] map = {0, 1, 1, 2};
+         powerbutton_dropdown.selected = map [settings.get_enum ("power-button-action")];
+diff --git a/src/Widgets/ScreenBrightnessList.vala b/src/Widgets/ScreenBrightnessList.vala
+new file mode 100644
+index 00000000..ce8bd164
+--- /dev/null
++++ b/src/Widgets/ScreenBrightnessList.vala
+@@ -0,0 +1,44 @@
++/*
++ * Copyright 2026 elementary, Inc. (https://elementary.io)
++ * SPDX-License-Identifier: GPL-3.0-or-later
++ */
++
++public class Power.ScreenBrightnessList : Granite.Box {
++    private BrightnessManager brightness_manager;
++    private Gtk.ListBox list_box;
++
++    public ScreenBrightnessList () {
++        Object (
++            orientation: Gtk.Orientation.VERTICAL,
++            child_spacing: Granite.Box.Spacing.HALF
++        );
++    }
++
++    construct {
++        brightness_manager = BrightnessManager.get_default ();
++
++        list_box = new Gtk.ListBox () {
++            selection_mode = Gtk.SelectionMode.NONE,
++            show_separators = true
++        };
++        list_box.add_css_class (Granite.STYLE_CLASS_RICH_LIST);
++        list_box.add_css_class (Granite.STYLE_CLASS_FRAME);
++
++        var header = new Granite.HeaderLabel (_("Monitors brightness")) {
++            mnemonic_widget = list_box
++        };
++        append (header);
++        append (list_box);
++
++        populate_list ();
++
++        brightness_manager.monitors_changed.connect (populate_list);
++    }
++
++    private void populate_list () {
++        list_box.remove_all ();
++        for (int i = 0; i < brightness_manager.get_n_monitors (); i++) {
++            list_box.append (new ScreenBrightnessRow (i));
++        }
++    }
++}
+diff --git a/src/Widgets/ScreenBrightnessRow.vala b/src/Widgets/ScreenBrightnessRow.vala
+new file mode 100644
+index 00000000..da5e0f19
+--- /dev/null
++++ b/src/Widgets/ScreenBrightnessRow.vala
+@@ -0,0 +1,151 @@
++/*
++ * Copyright 2026 elementary, Inc. (https://elementary.io)
++ * SPDX-License-Identifier: GPL-3.0-or-later
++ *
++ * Authored by: Denis Garaev <garaevdi@outlook.com>
++ */
++
++public class Power.ScreenBrightnessRow : Granite.ListItem {
++    private const double BRIGHTNESS_STEP = 0.005;
++
++    private BrightnessManager brightness_manager;
++    private Gtk.Scale brightness_slider;
++    private ulong slider_signal;
++    private ulong bm_signal;
++
++    private double total_y_delta = 0;
++    private double total_x_delta = 0;
++
++    public int index { get; construct; }
++
++    public ScreenBrightnessRow (int index) {
++        Object (index: index);
++    }
++
++    construct {
++        brightness_manager = BrightnessManager.get_default ();
++
++        var scroll_controller = new Gtk.EventControllerScroll (BOTH_AXES);
++        scroll_controller.scroll.connect (on_scroll);
++        add_controller (scroll_controller);
++
++        var monitor_label = new Gtk.Label (brightness_manager.get_monitor_name (index)) {
++            margin_start = 2,
++            margin_top = 2,
++            halign = Gtk.Align.START
++        };
++
++        text = brightness_manager.get_monitor_name (index);
++
++        if (index == 0) {
++            description = _("Primary");
++        }
++
++        var text_box = child;
++        child = null;
++
++        brightness_slider = new Gtk.Scale.with_range (HORIZONTAL, 0, 1, 0.1) {
++            margin_start = 2,
++            margin_end = 2,
++            hexpand = true,
++            draw_value = false,
++            width_request = 175
++        };
++
++        var box = new Granite.Box(HORIZONTAL, SINGLE);
++        box.append (text_box);
++        box.append (brightness_slider);
++        child = box;
++
++        slider_signal = brightness_slider.value_changed.connect (on_value_changed_internally);
++        bm_signal = brightness_manager.monitor_brightness_changed.connect (on_value_changed_externally);
++
++        brightness_slider.set_value (brightness_manager.get_monitor_brightness (index));
++    }
++
++    // We'd need to disable signals temporary here, so there wouldn't be a vicious signal loop
++    private void on_value_changed_internally (Gtk.Range value) {
++        SignalHandler.block (brightness_manager, bm_signal);
++        brightness_manager.set_monitor_brightness (index, value.get_value ());
++        SignalHandler.unblock (brightness_manager, bm_signal);
++    }
++
++    private void on_value_changed_externally (int ch_index, double value) {
++        if (index != ch_index) {
++            return;
++        }
++
++        SignalHandler.block (brightness_slider, slider_signal);
++        brightness_slider.set_value (value);
++        SignalHandler.unblock (brightness_slider, slider_signal);
++    }
++
++    private bool on_scroll (Gtk.EventControllerScroll controller, double dx, double dy) {
++        var event = (Gdk.ScrollEvent) controller.get_current_event ();
++        var event_device = event.get_device ();
++        bool natural_scroll;
++        var mouse_settings = new GLib.Settings ("org.gnome.desktop.peripherals.mouse");
++        var touchpad_settings = new GLib.Settings ("org.gnome.desktop.peripherals.touchpad");
++
++        var dir = 0.0;
++
++        if (event.get_device () == null) {
++            return false;
++        }
++
++
++        if (event_device.source == Gdk.InputSource.MOUSE) {
++            natural_scroll = mouse_settings.get_boolean ("natural-scroll");
++        } else if (event_device.source == Gdk.InputSource.TOUCHPAD) {
++            natural_scroll = touchpad_settings.get_boolean ("natural-scroll");
++        } else {
++            natural_scroll = true;
++        }
++
++        double delta_x, delta_y;
++        event.get_deltas (out delta_x, out delta_y);
++
++        switch (event.get_direction ()) {
++        case Gdk.ScrollDirection.SMOOTH:
++            var abs_x = double.max (delta_x.abs (), 0.0001);
++            var abs_y = double.max (delta_y.abs (), 0.0001);
++
++            if (abs_y / abs_x > 2.0) {
++                total_y_delta += delta_y;
++            } else if (abs_x / abs_y > 2.0) {
++                total_x_delta += delta_x;
++            }
++
++            break;
++        case Gdk.ScrollDirection.UP:
++            total_y_delta = -1.0;
++            break;
++        case Gdk.ScrollDirection.DOWN:
++            total_y_delta = 1.0;
++            break;
++        case Gdk.ScrollDirection.LEFT:
++            total_x_delta = -1.0;
++            break;
++        case Gdk.ScrollDirection.RIGHT:
++            total_x_delta = 1.0;
++            break;
++        default:
++            break;
++        }
++
++        if (total_y_delta.abs () * BRIGHTNESS_STEP > 0.001) {
++            dir = natural_scroll ? total_y_delta : -total_y_delta;
++        } else if (total_x_delta.abs () * BRIGHTNESS_STEP > 0.001) {
++            dir = natural_scroll ? -total_x_delta : total_x_delta;
++        }
++
++        if (dir.abs () > 0.0) {
++            total_y_delta = 0.0;
++            total_x_delta = 0.0;
++            var delta = (brightness_manager.get_monitor_brightness (index) + dir * BRIGHTNESS_STEP);
++            brightness_manager.set_monitor_brightness (index, delta);
++        }
++
++        return Gdk.EVENT_STOP;
++    }
++}
+diff --git a/src/meson.build b/src/meson.build
+index c5781c0f..ae780495 100644
+--- a/src/meson.build
++++ b/src/meson.build
+@@ -1,6 +1,7 @@
+ interfaces_file = files('Interfaces.vala')
+ 
+ plug_files = files(
++    'BrightnessManager.vala',
+     'Device.vala',
+     'GreeterAccountsServicePlugin.vala',
+     'LogindHelper.vala',
+@@ -10,6 +11,8 @@ plug_files = files(
+     'Widgets/BatteryBox.vala',
+     'Widgets/DevicesBox.vala',
+     'Widgets/TimeoutComboBox.vala',
++    'Widgets/ScreenBrightnessList.vala',
++    'Widgets/ScreenBrightnessRow.vala',
+     'Widgets/LidCloseActionComboBox.vala',
+     'Widgets/PowerModeButton.vala',
+ )

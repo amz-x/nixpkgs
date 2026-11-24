@@ -1,0 +1,34 @@
+diff --git a/src/Widgets/Screenshot.vala b/src/Widgets/Screenshot.vala
+index 549fed7..fb64075 100644
+--- a/src/Widgets/Screenshot.vala
++++ b/src/Widgets/Screenshot.vala
+@@ -13,6 +13,7 @@ public class AppCenter.Screenshot : Granite.Bin {
+     }
+ 
+     private static Gee.HashMap<string, Gtk.CssProvider>? providers;
++    private AppCenterCore.Package? package;
+     private Gtk.Picture picture;
+ 
+     class construct {
+@@ -43,11 +44,19 @@ public class AppCenter.Screenshot : Granite.Bin {
+     }
+ 
+     public void set_branding (AppCenterCore.Package package) {
++        this.package = package;
+         set_accent_color (package.get_color_primary ());
+ 
+-        Granite.Settings.get_default ().notify["prefers-color-scheme"].connect (() => {
++        // Connect a method rather than a closure capturing @package, so the
++        // long-lived Granite.Settings singleton doesn't keep a strong ref to
++        // this widget (and its full-size texture) after the page is closed.
++        Granite.Settings.get_default ().notify["prefers-color-scheme"].connect (on_color_scheme_changed);
++    }
++
++    private void on_color_scheme_changed () {
++        if (package != null) {
+             set_accent_color (package.get_color_primary ());
+-        });
++        }
+     }
+ 
+     private void set_accent_color (string? color) {

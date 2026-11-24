@@ -25,21 +25,31 @@
   systemdLibs,
 }:
 
-stdenv.mkDerivation rec {
+stdenv.mkDerivation {
   pname = "elementary-files";
-  version = "7.3.3";
+  version = "7.3.3-unstable-2026-11-22";
 
   outputs = [
     "out"
     "dev"
   ];
 
+  # nixpkgs-update: no auto update
   src = fetchFromGitHub {
     owner = "elementary";
     repo = "files";
-    rev = version;
-    hash = "sha256-Na5aiIgdAogSRwysz4v6U47tphVYVWleJ6OokXT+HMw=";
+    rev = "9cec2e77e87fd3f79af2d3d67bc1f83aaa89956c";
+    hash = "sha256-H0orcu3LANKXKqnuXD29rK0MZThJJsnCxODQxu9lZsE=";
   };
+
+  postPatch = ''
+    # pkexec's sanitized environment doesn't set $SHELL itself, so it
+    # falls through to whatever the invoking user's login shell is
+    # (fish, nu, ...) -- which the root-privileged files helper isn't
+    # prepared to run commands with. Force a POSIX shell instead.
+    substituteInPlace data/io.elementary.files-pkexec.in \
+      --replace-fail 'pkexec "@exec_name@"' 'SHELL=/bin/sh pkexec "@exec_name@"'
+  '';
 
   nativeBuildInputs = [
     desktop-file-utils

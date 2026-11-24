@@ -2,6 +2,8 @@
   lib,
   stdenv,
   callPackage,
+  # Linux only, forwarded so `proton-vpn.override` reaches linux.nix
+  withIndicator ? true,
   withSplitTunneling ? false,
 }:
 let
@@ -19,6 +21,4 @@ in
 if stdenv.hostPlatform.isDarwin then
   callPackage ./darwin.nix { inherit meta; }
 else
-  callPackage ./linux.nix {
-    inherit meta withSplitTunneling;
-  }
+  callPackage ./linux.nix { inherit meta withIndicator withSplitTunneling; }

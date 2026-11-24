@@ -19,18 +19,21 @@
   tzdata,
 }:
 
-stdenv.mkDerivation rec {
+stdenv.mkDerivation {
   pname = "switchboard-plug-datetime";
-  version = "8.1.0";
+  version = "8.1.0-unstable-2026-11-22";
 
+  # nixpkgs-update: no auto update
   src = fetchFromGitHub {
     owner = "elementary";
     repo = "switchboard-plug-datetime";
-    rev = version;
-    hash = "sha256-VOL0F0obuXVz0G5hMI/hpUf2T3H8XUw64wu4MxRi57g=";
+    rev = "c4de7a3fe66454f327a2162f3ee5b0ff194bb8e0";
+    hash = "sha256-HrAVyQuSKjFn2dwJh1mUZCTmAIn+AcMthtV1JLr4vZ8=";
   };
 
   patches = [
+    # Read the time zone list from tzdata in the store for the time zone
+    # picker, since NixOS has no /usr/share/zoneinfo.
     (replaceVars ./fix-paths.patch {
       tzdata = tzdata;
     })

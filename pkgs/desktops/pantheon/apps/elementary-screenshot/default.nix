@@ -15,15 +15,16 @@
   nix-update-script,
 }:
 
-stdenv.mkDerivation rec {
+stdenv.mkDerivation {
   pname = "elementary-screenshot";
-  version = "9.0.0";
+  version = "9.0.0-unstable-2026-11-21";
 
+  # nixpkgs-update: no auto update
   src = fetchFromGitHub {
     owner = "elementary";
     repo = "screenshot";
-    rev = version;
-    hash = "sha256-/whMAypdjAN/0FYwkqk2VgsfL3eQ0h+ewoGspVmoIfk=";
+    rev = "7fdb2fb264e6a4d83f7f65d21bed7faccfd55fb9";
+    hash = "sha256-m4jhLNaSUWy92sSokq0yDj3k04XPGw6maV1Rj+qGRbM=";
   };
 
   nativeBuildInputs = [

@@ -1,0 +1,227 @@
+From 47f704c4f3321ee826b923e45a89825b5647bf61 Mon Sep 17 00:00:00 2001
+From: Christopher Crouse <mail@amz-x.com>
+Date: Wed, 11 Nov 2026 10:03:28 +0200
+Subject: [PATCH] Convert high bit depth icons to 8 bit
+
+A single 16 bit PNG icon in the grid switches GTK's GPU renderer to
+high depth intermediates for the whole frame, in which SVG icons using
+feFlood + feBlend (e.g. Proton Mail Bridge) render as black squares.
+---
+ src/Widgets/AppButton.vala  |   6 +-
+ src/Widgets/AppIcon.vala    | 120 ++++++++++++++++++++++++++++++++++++
+ src/Widgets/AppListRow.vala |   5 +-
+ src/Widgets/SearchItem.vala |   9 ++-
+ src/meson.build             |   1 +
+ 5 files changed, 130 insertions(+), 11 deletions(-)
+ create mode 100644 src/Widgets/AppIcon.vala
+
+diff --git a/src/Widgets/AppButton.vala b/src/Widgets/AppButton.vala
+index 154d9b2..28ab108 100644
+--- a/src/Widgets/AppButton.vala
++++ b/src/Widgets/AppButton.vala
+@@ -36,11 +36,11 @@ public class Slingshot.Widgets.AppButton : Gtk.Button {
+             icon = new ThemedIcon ("application-default-icon");
+         }
+ 
+-        var image = new Gtk.Image.from_gicon (icon) {
++        var image = new AppIcon (ICON_SIZE) {
++            gicon = icon,
+             margin_top = 9,
+             margin_end = 6,
+-            margin_start = 6,
+-            pixel_size = ICON_SIZE
++            margin_start = 6
+         };
+ 
+         badge = new Gtk.Label ("!") {
+diff --git a/src/Widgets/AppIcon.vala b/src/Widgets/AppIcon.vala
+new file mode 100644
+index 0000000..d30ed35
+--- /dev/null
++++ b/src/Widgets/AppIcon.vala
+@@ -0,0 +1,120 @@
++/*
++ * SPDX-License-Identifier: GPL-3.0-or-later
++ * SPDX-FileCopyrightText: 2026 elementary, Inc. (https://elementary.io)
++ */
++
++/*
++ * An application icon that never puts high bit depth textures into the
++ * render tree.
++ *
++ * A single 16 bit or floating point texture (for example a 16 bit PNG
++ * application icon) switches GTK's GPU renderer to high depth
++ * intermediates for the whole frame. In that mode, SVG icons using filters
++ * like <feFlood flood-opacity="0"/> + <feBlend/> render as black squares,
++ * since the blend of two transparent pixels is NaN, which no longer gets
++ * flushed to 0. Since the grid shows many unrelated icons in one frame, one
++ * app's icon would break another's, so raster icons are converted to 8 bit.
++ */
++public class Slingshot.AppIcon : Gtk.Widget {
++    public GLib.Icon? gicon { get; set; }
++    public int pixel_size { get; construct; }
++
++    private Gtk.Image image;
++
++    public AppIcon (int pixel_size) {
++        Object (pixel_size: pixel_size);
++    }
++
++    class construct {
++        set_layout_manager_type (typeof (Gtk.BinLayout));
++    }
++
++    construct {
++        image = new Gtk.Image () {
++            pixel_size = pixel_size
++        };
++        image.set_parent (this);
++
++        notify["gicon"].connect (update);
++        notify["scale-factor"].connect (update);
++        Gtk.IconTheme.get_for_display (Gdk.Display.get_default ()).changed.connect (update);
++    }
++
++    public override void dispose () {
++        image.unparent ();
++        base.dispose ();
++    }
++
++    private void update () {
++        image.gicon = gicon;
++
++        if (gicon == null) {
++            return;
++        }
++
++        unowned var theme = Gtk.IconTheme.get_for_display (Gdk.Display.get_default ());
++        var icon_paintable = theme.lookup_by_gicon (gicon, pixel_size, scale_factor, get_direction (), 0);
++        var file = icon_paintable.file;
++        if (file == null) {
++            return;
++        }
++
++        // Only PNG icons can have more than 8 bits per channel. Leave symbolic
++        // ones to GTK, which recolors them.
++        var basename = file.get_basename ().down ();
++        if (!basename.has_suffix (".png") || basename.has_suffix ("-symbolic.png") || basename.has_suffix (".symbolic.png")) {
++            return;
++        }
++
++        Gdk.Texture texture;
++        try {
++            texture = Gdk.Texture.from_file (file);
++        } catch (Error e) {
++            return;
++        }
++
++        if (!is_high_depth (texture.get_format ())) {
++            return;
++        }
++
++        var downloader = new Gdk.TextureDownloader (texture);
++        downloader.set_format (R8G8B8A8_PREMULTIPLIED);
++
++        size_t stride;
++        var bytes = downloader.download_bytes (out stride);
++
++        image.paintable = new Gdk.MemoryTexture (
++            texture.width,
++            texture.height,
++            R8G8B8A8_PREMULTIPLIED,
++            bytes,
++            stride
++        );
++    }
++
++    private static bool is_high_depth (Gdk.MemoryFormat format) {
++        switch (format) {
++            case B8G8R8A8_PREMULTIPLIED:
++            case A8R8G8B8_PREMULTIPLIED:
++            case R8G8B8A8_PREMULTIPLIED:
++            case A8B8G8R8_PREMULTIPLIED:
++            case B8G8R8A8:
++            case A8R8G8B8:
++            case R8G8B8A8:
++            case A8B8G8R8:
++            case B8G8R8X8:
++            case X8R8G8B8:
++            case R8G8B8X8:
++            case X8B8G8R8:
++            case R8G8B8:
++            case B8G8R8:
++            case G8A8_PREMULTIPLIED:
++            case G8A8:
++            case G8:
++            case A8:
++                return false;
++            default:
++                return true;
++        }
++    }
++}
+diff --git a/src/Widgets/AppListRow.vala b/src/Widgets/AppListRow.vala
+index f857c21..34cd768 100644
+--- a/src/Widgets/AppListRow.vala
++++ b/src/Widgets/AppListRow.vala
+@@ -30,9 +30,8 @@ public class Slingshot.AppListRow : Gtk.ListBoxRow {
+             icon = new ThemedIcon ("application-default-icon");
+         }
+ 
+-        var image = new Gtk.Image () {
+-            gicon = icon,
+-            pixel_size = 32
++        var image = new AppIcon (32) {
++            gicon = icon
+         };
+ 
+         var name_label = new Gtk.Label (app_info.get_display_name ()) {
+diff --git a/src/Widgets/SearchItem.vala b/src/Widgets/SearchItem.vala
+index 033706f..195201a 100644
+--- a/src/Widgets/SearchItem.vala
++++ b/src/Widgets/SearchItem.vala
+@@ -13,7 +13,7 @@ public class Slingshot.Widgets.SearchItem : Gtk.ListBoxRow {
+     public string search_term { get; construct; }
+     public ResultType result_type { public get; construct; }
+ 
+-    public Gtk.Image image { public get; private set; }
++    public AppIcon image { public get; private set; }
+     public string? app_uri { get; private set; }
+ 
+     private Gtk.Label name_label;
+@@ -52,9 +52,8 @@ public class Slingshot.Widgets.SearchItem : Gtk.ListBoxRow {
+             icon = new ThemedIcon ("application-default-icon");
+         }
+ 
+-        image = new Gtk.Image () {
+-            gicon = icon,
+-            pixel_size = ICON_SIZE
++        image = new AppIcon (ICON_SIZE) {
++            gicon = icon
+         };
+ 
+         tooltip_markup = app.description;
+@@ -62,7 +61,7 @@ public class Slingshot.Widgets.SearchItem : Gtk.ListBoxRow {
+         if (app.match != null && app.match.icon_name.has_prefix (Path.DIR_SEPARATOR_S)) {
+             var pixbuf = Backend.SynapseSearch.get_pathicon_for_match (app.match, ICON_SIZE);
+             if (pixbuf != null) {
+-                image.set_from_pixbuf (pixbuf);
++                image.gicon = Gdk.Texture.for_pixbuf (pixbuf);
+             }
+         }
+ 
+diff --git a/src/meson.build b/src/meson.build
+index e0fc2a3..3025e6f 100644
+--- a/src/meson.build
++++ b/src/meson.build
+@@ -26,6 +26,7 @@ sources = [
+     'Views/SearchView.vala',
+ 
+     'Widgets/AppButton.vala',
++    'Widgets/AppIcon.vala',
+     'Widgets/AppListRow.vala',
+     'Widgets/Switcher.vala',
+     'Widgets/SearchItem.vala',
+-- 
+2.56.0
+

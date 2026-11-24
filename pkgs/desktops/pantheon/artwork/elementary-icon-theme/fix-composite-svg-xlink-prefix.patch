@@ -1,0 +1,10 @@
+--- a/scripts/composite-svg.py
++++ b/scripts/composite-svg.py
+@@ -2,6 +2,7 @@ import sys
+ import xml.etree.ElementTree as ET
+ 
+ ET.register_namespace("","http://www.w3.org/2000/svg")
++ET.register_namespace("xlink","http://www.w3.org/1999/xlink")
+ 
+ svg = "{http://www.w3.org/2000/svg}"
+ fTop = sys.argv[1]     # Type file

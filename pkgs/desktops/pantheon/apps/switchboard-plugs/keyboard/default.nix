@@ -23,27 +23,29 @@
   switchboard,
 }:
 
-stdenv.mkDerivation rec {
+stdenv.mkDerivation {
   pname = "switchboard-plug-keyboard";
-  version = "8.1.1";
+  version = "8.1.1-unstable-2026-11-22";
 
+  # nixpkgs-update: no auto update
   src = fetchFromGitHub {
     owner = "elementary";
     repo = "settings-keyboard";
-    rev = version;
-    hash = "sha256-JuFx0PkbB6ctXhqtORlgtSq9oigaLL2N4IKX7NQgHcU=";
+    rev = "77688e3161fcf859a55ea7eec7b8e13a525e307a";
+    hash = "sha256-D6CEXfX4+Xca+r81l1X7BgXcUxbdWnMMQvLS5vPvED8=";
   };
 
   patches = [
+    # Follow gala's D-Bus rename to io.elementary.gala
+    # https://github.com/elementary/gala/pull/2046
+    ./feature-gala-rdnn-dbus.patch
+
     # This will try to install packages with apt.
     # https://github.com/elementary/settings-keyboard/issues/324
-    ./hide-install-unlisted-engines-button.patch
+    ./fix-hide-install-unlisted-engines-button.patch
 
-    # We no longer ship Pantheon X11 session in NixOS.
-    # https://github.com/elementary/session-settings/issues/91
-    # https://github.com/elementary/session-settings/issues/82
-    ./hide-onscreen-keyboard-settings.patch
-
+    # Launch gkbd-keyboard-display from the store for the add layout dialog's
+    # keyboard map button, since libgnomekbd isn't on PATH in the session.
     (replaceVars ./fix-paths.patch {
       inherit libgnomekbd;
     })

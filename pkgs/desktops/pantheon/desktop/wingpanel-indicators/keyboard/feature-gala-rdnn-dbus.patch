@@ -1,0 +1,22 @@
+--- a/src/DesktopIntegration.vala
++++ b/src/DesktopIntegration.vala
+@@ -3,7 +3,7 @@
+  * SPDX-License-Identifier: GPL-3.0-or-later
+  */
+ 
+-[DBus (name = "org.pantheon.gala.DesktopIntegration")]
++[DBus (name = "io.elementary.gala.DesktopIntegration")]
+ public interface Keyboard.DesktopIntegration : GLib.Object {
+     public signal void caps_lock_state_changed ();
+     public signal void num_lock_state_changed ();
+--- a/src/Indicator.vala
++++ b/src/Indicator.vala
+@@ -27,7 +27,7 @@
+ 
+     construct {
+         try {
+-            desktop_integration = Bus.get_proxy_sync (SESSION , "org.pantheon.gala", "/org/pantheon/gala/DesktopInterface");
++            desktop_integration = Bus.get_proxy_sync (SESSION , "io.elementary.gala", "/io/elementary/gala/DesktopInterface");
+             desktop_integration.caps_lock_state_changed.connect (update_visibility);
+             desktop_integration.num_lock_state_changed.connect (update_visibility);
+         } catch (Error e) {

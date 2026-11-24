@@ -2,13 +2,13 @@
   lib,
   stdenv,
   fetchFromGitHub,
-  fetchpatch,
   nix-update-script,
   pkg-config,
   meson,
   ninja,
   vala,
   gtk3,
+  gtk4,
   libxml2,
   libhandy,
   libportal-gtk3,
@@ -25,22 +25,34 @@
 
 stdenv.mkDerivation (finalAttrs: {
   pname = "elementary-mail";
-  version = "8.0.1";
+  version = "8.0.1-unstable-2026-10-25";
 
+  # nixpkgs-update: no auto update
   src = fetchFromGitHub {
     owner = "elementary";
     repo = "mail";
-    tag = finalAttrs.version;
-    hash = "sha256-6DY8pJXPXz6uaBKR/qLxYpAQfpzlzi/wtj1douhSjpQ=";
+    rev = "bccf78bf76c59ebbce03f6b64f0c77caedf7e5cd";
+    hash = "sha256-U2eCqH+mlHGFOYf098pYhXapzVbvSLma+/qgrqbIF4s=";
   };
 
   patches = [
-    # Adapt to libcamel API changes in 3.57.1
-    # https://github.com/elementary/mail/pull/1023
-    (fetchpatch {
-      url = "https://github.com/elementary/mail/commit/8cb5bb87ceca9000c2a556bafeb059b9f1cbf2f1.patch";
-      hash = "sha256-NFZVvKJyPTV+lRcefTIgm2jOmCfrY+TlawDYzGTBd7Y=";
-    })
+    # Camel rejected untrusted certificates (self-signed, a local bridge's)
+    # with "Unacceptable TLS certificate" since the session never asked; show
+    # Evolution Data Server's trust prompt like Evolution does
+    ./feature-trust-prompt-for-mail-certificates.patch
+
+    # GTK 3 on Wayland keeps a plain pointer to the window a tooltip is
+    # attached to; when that window closes (a context menu the pointer passed
+    # over), the tooltip later dereferences it and Mail crashes. Detach
+    # transient windows in GDK before their parent goes away. Drop with the
+    # GTK 4 port.
+    ./fix-wayland-tooltip-crash-on-closed-window.patch
+
+    # GTK 3 reads the message web view back into a Cairo image the full height
+    # of the view without checking the allocation, which fails past 32767
+    # pixels, so a very long message crashed Mail; cap the view's height and
+    # let the rest scroll inside it
+    ./fix-crash-on-very-long-messages.patch
   ];
 
   nativeBuildInputs = [
@@ -59,6 +71,7 @@ stdenv.mkDerivation (finalAttrs: {
     glib-networking
     granite
     gtk3
+    gtk4
     libgee
     libhandy
     libportal-gtk3

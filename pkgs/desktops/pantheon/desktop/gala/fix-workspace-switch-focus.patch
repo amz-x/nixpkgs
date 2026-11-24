@@ -1,0 +1,63 @@
+diff --git a/lib/WindowManager.vala b/lib/WindowManager.vala
+index 1742bc6..5abc88d 100644
+--- a/lib/WindowManager.vala
++++ b/lib/WindowManager.vala
+@@ -54,6 +54,13 @@ namespace Gala {
+     public class ModalProxy : Object {
+         public Clutter.Grab? grab { get; set; }
+ 
++        /**
++         * Whether windows may keep the input focus while this modal is active.
++         * Used while only animating a workspace switch, so the window mutter
++         * focuses on the new workspace isn't unfocused and refocused later.
++         */
++        public bool allow_window_focus { get; set; default = false; }
++
+         private ModalActions allowed_actions;
+         private WindowGroup[] allowed_window_groups;
+ 
+diff --git a/src/Widgets/MultitaskingView/MultitaskingView.vala b/src/Widgets/MultitaskingView/MultitaskingView.vala
+index 06d3ec2..c019706 100644
+--- a/src/Widgets/MultitaskingView/MultitaskingView.vala
++++ b/src/Widgets/MultitaskingView/MultitaskingView.vala
+@@ -272,7 +272,16 @@ public class Gala.MultitaskingView : Root, RootTarget {
+             modal_proxy = wm.push_modal (get_stage (), false);
+             modal_proxy.allow_actions (MULTITASKING_VIEW | SWITCH_WORKSPACE | ZOOM | LOCATE_POINTER | MEDIA_KEYS | SCREENSHOT | SCREENSHOT_AREA);
+             modal_proxy.allow_window_groups (ALLOWED_WINDOW_GROUPS);
++            /* While only animating a workspace switch, leave the focus to mutter:
++               unsetting it would unfocus the window mutter focuses on the new
++               workspace, and X11 clients like Wine may not take the later
++               refocus, leaving the window without keyboard focus */
++            modal_proxy.allow_window_focus = action == SWITCH_WORKSPACE;
+         } else if (action == MULTITASKING_VIEW) {
++            if (modal_proxy != null) {
++                modal_proxy.allow_window_focus = false;
++            }
++
+             DragDropAction.cancel_all_by_id ("multitaskingview-window");
+         }
+ 
+diff --git a/src/WindowManager.vala b/src/WindowManager.vala
+index f48873f..eef1c94 100644
+--- a/src/WindowManager.vala
++++ b/src/WindowManager.vala
+@@ -459,6 +459,8 @@ namespace Gala {
+ 
+             modal_stack.offer_head (proxy);
+ 
++            proxy.notify["allow-window-focus"].connect (() => on_focus_window_changed ());
++
+             if (grab) {
+                 proxy.grab = stage.grab (actor);
+             }
+@@ -527,6 +529,10 @@ namespace Gala {
+                 return;
+             }
+ 
++            if (modal_stack.peek_head ().allow_window_focus) {
++                return;
++            }
++
+             if (overridden_window_group.has_key (display.focus_window)) {
+                 var overridden_group = overridden_window_group[display.focus_window];
+ 

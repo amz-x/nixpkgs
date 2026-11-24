@@ -1,0 +1,22 @@
+diff --git a/src/Cards/UserCard.vala b/src/Cards/UserCard.vala
+index 4f9a4be3..1c7ef3e1 100644
+--- a/src/Cards/UserCard.vala
++++ b/src/Cards/UserCard.vala
+@@ -187,7 +187,7 @@ public class Greeter.UserCard : Greeter.BaseCard {
+             return path;
+         }
+ 
+-        return "/usr/share/backgrounds/elementaryos-default";
++        return "@default_wallpaper@";
+     }
+ 
+     private void set_background_image () {
+@@ -217,7 +217,7 @@ public class Greeter.UserCard : Greeter.BaseCard {
+ 
+             background_picture.paintable = (Gdk.Texture.for_pixbuf (pixbuf));
+         } else {
+-            background_picture.set_filename ("/usr/share/backgrounds/elementaryos-default");
++            background_picture.set_filename ("@default_wallpaper@");
+         }
+ 
+         var clamp = new Adw.Clamp () {

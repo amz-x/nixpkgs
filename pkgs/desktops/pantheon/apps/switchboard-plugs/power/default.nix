@@ -9,6 +9,9 @@
   vala,
   libadwaita,
   libgee,
+  libgtop,
+  libnotify,
+  libudev-zero,
   gettext,
   gnome-settings-daemon,
   granite7,
@@ -17,19 +20,28 @@
   dbus,
   polkit,
   switchboard,
+  wingpanel,
   wingpanel-indicator-power,
 }:
 
-stdenv.mkDerivation rec {
+stdenv.mkDerivation {
   pname = "switchboard-plug-power";
-  version = "8.1.0";
+  version = "8.1.0-unstable-2026-11-22";
 
+  # nixpkgs-update: no auto update
   src = fetchFromGitHub {
     owner = "elementary";
     repo = "settings-power";
-    tag = version;
-    hash = "sha256-JfOLGDS2/Qa6RmEfiDBZfeT+dM4NN4N2NoXRNJ4Q+Es=";
+    rev = "1d3ac9870172105a5c1c72ccffd25009db325932";
+    hash = "sha256-AojGTnbl/bjdxLLd9dtb7CkocvuNoFudJBu821jJXfk=";
   };
+
+  patches = [
+    # Control brightness through gala's BrightnessManager, since mutter 49+
+    # removed the gnome-settings-daemon backlight interface it used
+    # https://github.com/elementary/settings-power/pull/301
+    ./feature-gala-brightness-manager.patch
+  ];
 
   nativeBuildInputs = [
     gettext # msgfmt
@@ -47,8 +59,12 @@ stdenv.mkDerivation rec {
     gtk4
     libadwaita
     libgee
+    libgtop
+    libnotify
+    libudev-zero
     polkit
     switchboard
+    wingpanel
     wingpanel-indicator-power # settings schema
   ];
 

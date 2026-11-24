@@ -40,7 +40,12 @@ buildGoModule (finalAttrs: {
 
   proxyVendor = true; # .c file
 
-  patches = [ ./permissions.patch ];
+  patches = [
+    ./permissions.patch
+    # Split tunnel resolves app binaries (for the app list and when adding an app)
+    # on the daemon's PATH, which on NixOS lacks the system and per-user profiles.
+    ./nix-app-paths.patch
+  ];
 
   postPatch = ''
     substituteInPlace daemon/service/platform/platform_linux.go \

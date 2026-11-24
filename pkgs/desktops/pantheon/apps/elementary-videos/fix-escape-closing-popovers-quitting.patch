@@ -1,0 +1,49 @@
+diff --git a/src/Window.vala b/src/Window.vala
+index 50bcb667..ba728172 100644
+--- a/src/Window.vala
++++ b/src/Window.vala
+@@ -27,6 +27,7 @@ public class Audience.Window : Gtk.ApplicationWindow {
+     private LibraryPage library_page;
+     private PlayerPage player_page;
+     private WelcomePage welcome_page;
++    private bool escape_pressed = false;
+ 
+     public enum NavigationPage { WELCOME, LIBRARY, EPISODES }
+ 
+@@ -84,6 +85,9 @@ public class Audience.Window : Gtk.ApplicationWindow {
+         navigation_view = new Adw.NavigationView ();
+         navigation_view.add (welcome_page);
+ 
++        // Escape goes back, except in fullscreen where handle_key_press () leaves fullscreen
++        bind_property ("fullscreened", navigation_view, "pop-on-escape", SYNC_CREATE | INVERT_BOOLEAN);
++
+         app_notification = new Granite.Toast ("");
+ 
+         var overlay = new Gtk.Overlay () {
+@@ -149,6 +153,10 @@ public class Audience.Window : Gtk.ApplicationWindow {
+ 
+         var key_controller = new Gtk.EventControllerKey ();
+         overlay.add_controller (key_controller);
++        key_controller.key_pressed.connect ((keyval) => {
++            escape_pressed = keyval == Gdk.Key.Escape;
++            return false;
++        });
+         key_controller.key_released.connect (handle_key_press);
+ 
+         var drop_target = new Gtk.DropTarget (typeof (Gdk.FileList), COPY);
+@@ -226,11 +234,12 @@ public class Audience.Window : Gtk.ApplicationWindow {
+     }
+ 
+     public void handle_key_press (uint keyval, uint keycode, Gdk.ModifierType state) {
+-        if (keyval == Gdk.Key.Escape) {
++        // Only handle Escape if its press wasn't already consumed, e.g. by
++        // a popover closing itself or a search entry clearing its text
++        if (keyval == Gdk.Key.Escape && escape_pressed) {
++            escape_pressed = false;
+             if (fullscreened) {
+                 unfullscreen ();
+-            } else {
+-                destroy ();
+             }
+         }
+ 

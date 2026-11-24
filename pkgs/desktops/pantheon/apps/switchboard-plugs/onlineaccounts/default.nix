@@ -15,16 +15,24 @@
   switchboard,
 }:
 
-stdenv.mkDerivation rec {
+stdenv.mkDerivation {
   pname = "switchboard-plug-onlineaccounts";
-  version = "8.0.2";
+  version = "8.0.2-unstable-2026-11-22";
 
+  # nixpkgs-update: no auto update
   src = fetchFromGitHub {
     owner = "elementary";
     repo = "settings-onlineaccounts";
-    rev = version;
-    hash = "sha256-0dt4E2g1nX78s2WK2HO6P/fKjXcsR61KJSpulgsZHPI=";
+    rev = "2f370b8a0d916a34706fcf4b1887b4bddb52372e";
+    hash = "sha256-wvnNn77iYOnw4zNz7j4uK6S2drAQYVYwfOA5XmWAlII=";
   };
+
+  patches = [
+    # Camel rejected mail servers with untrusted certificates (self-signed,
+    # unknown CA) with "Unacceptable TLS certificate", since the session never
+    # asked; show Evolution Data Server's trust prompt like Evolution does.
+    ./feature-trust-prompt-for-mail-certificates.patch
+  ];
 
   nativeBuildInputs = [
     glib # glib-compile-resources
